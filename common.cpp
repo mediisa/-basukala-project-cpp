@@ -7,6 +7,7 @@
 #include <unordered_map>
 
 
+
 const std::vector<char> WAREHOUSE_CITIES = {'B', 'I'};
 const std::unordered_map<char, std::string> CITY_LABELS = {
     {'A', "Bimsy"}, {'B', "Garous"}, {'C', "Debrecen"}, {'D', "Lae"},
