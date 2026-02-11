@@ -9,6 +9,19 @@
 
 extern int orderSequence;
 extern int packageSequence;
+extern long long globalPackageSequence;
+
+extern std::vector<User> users;
+extern std::vector<Product> products;
+extern std::vector<OrderRecord> orders;
+extern std::vector<Package> packages;
+
+
+extern const double SHIPPING_COST;
+extern const std::string USERS_FILE;
+extern const std::string PRODUCTS_FILE;
+extern const std::string ORDERS_FILE;
+extern const std::string PACKAGES_FILE;
 
 struct OrderItem {
     std::string productName;

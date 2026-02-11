@@ -7,6 +7,22 @@
 #include <unordered_map>
 
 
+std::vector<User> users;
+std::vector<Product> products;
+std::vector<OrderRecord> orders;
+std::vector<Package> packages;
+
+long long globalPackageSequence = 0;
+int orderSequence = 0;
+int packageSequence = 0;
+
+
+const double SHIPPING_COST = 100.0;
+const std::string USERS_FILE = "users.txt";
+const std::string PRODUCTS_FILE = "products.txt";
+const std::string ORDERS_FILE = "orders.txt";
+const std::string PACKAGES_FILE = "packages.txt";
+
 
 const std::vector<char> WAREHOUSE_CITIES = {'B', 'I'};
 const std::unordered_map<char, std::string> CITY_LABELS = {
