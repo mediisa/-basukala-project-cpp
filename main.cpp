@@ -1,7 +1,16 @@
+#include "common.h"
+#include "admin.h"
+#include "customer.h"
+#include "WRFile.h"
 #include <iostream>
-using namespace std;
+
+
+bool registerUser();
+User* login();
+void mainMenu();
+
 
 int main() {
-    cout << "Basukala Project Started!" << endl;
+    std::cout << "Basukala Project Started!  \n\n ";
     return 0;
 }
