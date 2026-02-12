@@ -40,6 +40,7 @@ struct OrderRecord {
     std::string id;
     std::string username;
     std::vector<OrderItem> items;
+    double totalCost = 0.0;
     char destinationCity = 'A';
     std::string address;
     std::string status = "Pending"; 
@@ -102,4 +103,14 @@ public:
 
 std::unordered_map<char, std::vector<std::pair<char, int>>> buildCityGraph();
 
+std::vector<std::string> split(const std::string &line, char delimiter);
+std::string join(const std::vector<std::string> &items, char delimiter);
+std::string trim(const std::string &s);
+
+std::string encodeOrderItems(const std::vector<OrderItem> &items);
+std::vector<OrderItem> decodeOrderItems(const std::string &encoded);
+
+User* findUser(const std::string &username);
+Product* findProduct(const std::string &name);
+OrderRecord* findOrder(const std::string &orderId);
 #endif
