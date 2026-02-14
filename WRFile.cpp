@@ -118,6 +118,7 @@ void loadOrdersFromFile() {
     fin.close();
 }
 
+
 void saveOrdersToFile() {
     std::ofstream fout(ORDERS_FILE, std::ios::trunc);
     for (size_t i = 0; i < orders.size(); ++i) {
@@ -133,6 +134,7 @@ void saveOrdersToFile() {
     }
     fout.close();
 }
+
 
 void loadPackagesFromFile() {
     packages.clear();
@@ -164,6 +166,7 @@ void loadPackagesFromFile() {
     }
     fin.close();
 }
+
 
 void savePackagesToFile() {
     std::ofstream fout(PACKAGES_FILE, std::ios::trunc);
