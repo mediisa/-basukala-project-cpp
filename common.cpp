@@ -242,6 +242,7 @@ std::vector<OrderItem> decodeOrderItems(const std::string &encoded) {
     return items;
 }
 
+
 User* findUser(const std::string &username) {
     for (auto &u : users) if (u.username == username) return &u;
     return nullptr;
