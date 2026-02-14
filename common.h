@@ -110,6 +110,7 @@ std::string trim(const std::string &s);
 std::string encodeOrderItems(const std::vector<OrderItem> &items);
 std::vector<OrderItem> decodeOrderItems(const std::string &encoded);
 
+
 User* findUser(const std::string &username);
 Product* findProduct(const std::string &name);
 OrderRecord* findOrder(const std::string &orderId);
