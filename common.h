@@ -11,10 +11,6 @@ extern int orderSequence;
 extern int packageSequence;
 extern long long globalPackageSequence;
 
-extern std::vector<User> users;
-extern std::vector<Product> products;
-extern std::vector<OrderRecord> orders;
-extern std::vector<Package> packages;
 
 
 extern const double SHIPPING_COST;
@@ -22,6 +18,12 @@ extern const std::string USERS_FILE;
 extern const std::string PRODUCTS_FILE;
 extern const std::string ORDERS_FILE;
 extern const std::string PACKAGES_FILE;
+
+
+extern const std::vector<char> WAREHOUSE_CITIES;
+extern const std::unordered_map<char, std::string> CITY_LABELS;
+
+
 
 struct OrderItem {
     std::string productName;
@@ -81,6 +83,10 @@ struct PathResult {
     bool reachable = false;
 };
 
+struct PackageComparator {
+    bool operator()(Package* a, Package* b) const;
+};
+
 std::string nextOrderId();
 std::string nextPackageId();
 
@@ -114,4 +120,22 @@ std::vector<OrderItem> decodeOrderItems(const std::string &encoded);
 User* findUser(const std::string &username);
 Product* findProduct(const std::string &name);
 OrderRecord* findOrder(const std::string &orderId);
+
+PathResult dijkstra(char start, char target,
+                    const std::unordered_map<char, std::vector<std::pair<char, int>>> &graph);
+
+PathResult shortestRouteFromNearestWarehouse(char destination);
+std::string formatRouteDisplay(const std::vector<char> &path, int distance);
+
+void refreshUserHistoryStatus(User &user);
+
+
+
+extern std::vector<User> users;
+extern std::vector<Product> products;
+extern std::vector<OrderRecord> orders;
+extern std::vector<Package> packages;
+extern ProductTrie productTrie;
+
+
 #endif
