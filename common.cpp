@@ -5,12 +5,17 @@
 #include <sstream>
 #include <iomanip>
 #include <unordered_map>
+#include <queue>
+#include <algorithm>
+#include <utility>
+#include <limits>
 
 
 std::vector<User> users;
 std::vector<Product> products;
 std::vector<OrderRecord> orders;
 std::vector<Package> packages;
+ProductTrie productTrie;
 
 long long globalPackageSequence = 0;
 int orderSequence = 0;
@@ -26,10 +31,18 @@ const std::string PACKAGES_FILE = "packages.txt";
 
 const std::vector<char> WAREHOUSE_CITIES = {'B', 'I'};
 const std::unordered_map<char, std::string> CITY_LABELS = {
-    {'A', "Bimsy"}, {'B', "Garous"}, {'C', "Debrecen"}, {'D', "Lae"},
-    {'E', "Merribell"}, {'F', "Wimbie"}, {'G', "Aguascalientes"},
-    {'H', "Froli"}, {'I', "Tainan"}, {'J', "Honara"},
-    {'K', "Twinklehollow"}, {'L', "Trinkleby"}
+    {'A', "Bimsy"},
+    {'B', "Garous"},
+    {'C', "Debrecen"},
+    {'D', "Lae"},
+    {'E', "Merribell"},
+    {'F', "Wimbie"},
+    {'G', "Aguascalientes"},
+    {'H', "Froli"},
+    {'I', "Tainan"},
+    {'J', "Honara"},
+    {'K', "Twinklehollow"},
+    {'L', "Trinkleby"}
 };
 
 
@@ -256,4 +269,96 @@ Product* findProduct(const std::string &name) {
 OrderRecord* findOrder(const std::string &orderId) {
     for (auto &o : orders) if (o.id == orderId) return &o;
     return nullptr;
+}
+
+PathResult dijkstra(char start, char target,
+                    const std::unordered_map<char, std::vector<std::pair<char, int>>> &graph) {
+    std::unordered_map<char, int> dist;
+    std::unordered_map<char, char> parent;
+    for (const auto &entry : graph) dist[entry.first] = INT_MAX;
+    dist[start] = 0;
+
+    using PQItem = std::pair<int, char>;
+    std::priority_queue<PQItem, std::vector<PQItem>, std::greater<PQItem>> pq;
+    pq.push({0, start});
+
+    while (!pq.empty()) {
+        auto [currentDist, node] = pq.top();
+        pq.pop();
+        if (currentDist != dist[node]) continue;
+        if (node == target) break;
+        for (auto &[neighbor, weight] : graph.at(node)) {
+            if (dist[node] + weight < dist[neighbor]) {
+                dist[neighbor] = dist[node] + weight;
+                parent[neighbor] = node;
+                pq.push({dist[neighbor], neighbor});
+            }
+        }
+    }
+
+    PathResult result;
+    if (dist.find(target) == dist.end() || dist.at(target) == INT_MAX) return result;
+    result.reachable = true;
+    result.distance = dist[target];
+
+    std::vector<char> reversed;
+    char cur = target;
+    reversed.push_back(cur);
+    while (cur != start) {
+        cur = parent[cur];
+        reversed.push_back(cur);
+    }
+    reverse(reversed.begin(), reversed.end());
+    result.path = reversed;
+    return result;
+}
+
+PathResult shortestRouteFromNearestWarehouse(char destination) {
+    auto graph = buildCityGraph();
+    PathResult best;
+    for (char warehouse : WAREHOUSE_CITIES) {
+        PathResult candidate = dijkstra(warehouse, destination, graph);
+        if (!candidate.reachable) continue;
+        if (!best.reachable || candidate.distance < best.distance) {
+            best = candidate;
+        }
+    }
+    return best;
+}
+
+std::string formatRouteDisplay(const std::vector<char> &path, int distance) {
+    if (path.empty()) return "Route unavailable";
+    std::stringstream ss;
+    for (size_t i = 0; i < path.size(); ++i) {
+        ss << path[i];
+        if (i + 1 < path.size()) ss << " -> ";
+    }
+    ss << " | Distance: " << distance;
+    return ss.str();
+}
+
+
+void refreshUserHistoryStatus(User &user) {
+    for (auto &entry : user.orderHistory) {
+        size_t statusPos = entry.find("Status:");
+        if (statusPos == std::string::npos) continue;
+        size_t lb = entry.find('[');
+        size_t rb = entry.find(']');
+        if (lb == std::string::npos || rb == std::string::npos || rb <= lb + 1) continue;
+        std::string orderId = entry.substr(lb + 1, rb - lb - 1);
+        OrderRecord* order = findOrder(orderId);
+        if (!order) continue;
+        entry = entry.substr(0, statusPos) + "Status: " + order->status;
+    }
+}
+
+
+bool PackageLess(const Package* a, const Package* b) {
+    if (a->score != b->score) return a->score < b->score; 
+    return a->enqueueIndex > b->enqueueIndex;
+}
+
+bool PackageComparator::operator()(Package* a, Package* b) const {
+    if (a->score != b->score) return a->score < b->score; 
+    return a->enqueueIndex > b->enqueueIndex; 
 }
