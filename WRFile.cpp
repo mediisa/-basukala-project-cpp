@@ -3,6 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
+#include <algorithm>
 
 
 void loadUsersFromFile() {
@@ -72,6 +73,32 @@ void loadProductsFromFile() {
         p.price = stod(parts[1]);
         p.stock = stoi(parts[2]);
         p.soldCount = stoi(parts[3]);
+        p.category = PRODUCT_CATEGORIES.empty() ? "دسته نامشخص" : PRODUCT_CATEGORIES.front();
+        
+        
+        if (parts.size() > 4) {
+            std::string catCandidate = trim(parts[4]);
+            if (!catCandidate.empty()) {
+                bool matched = false;
+                for (const auto &allowed : PRODUCT_CATEGORIES) {
+                    if (equalsIgnoreCase(allowed, catCandidate)) {
+                        p.category = allowed;
+                        matched = true;
+                        break;
+                    }
+                }
+                        if (!matched) {
+                    p.category = catCandidate;
+                }
+            }
+        }
+
+        bool recognized = PRODUCT_CATEGORIES.empty() ? true :
+            std::any_of(PRODUCT_CATEGORIES.begin(), PRODUCT_CATEGORIES.end(),
+                        [&](const std::string &allowed) { return equalsIgnoreCase(allowed, p.category); });
+        if (!recognized && !PRODUCT_CATEGORIES.empty()) {
+            p.category = PRODUCT_CATEGORIES.front();
+        }
         products.push_back(p);
     }
         fin.close();
@@ -84,7 +111,8 @@ void saveProductsToFile() {
         fout << p.name << "|"
              << std::fixed << std::setprecision(2) << p.price << "|"
              << p.stock << "|"
-             << p.soldCount;
+             << p.soldCount<< "|"
+             << p.category;
         if (i + 1 < products.size()) fout << "\n";
     }
     fout.close();
