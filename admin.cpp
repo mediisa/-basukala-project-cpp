@@ -15,9 +15,17 @@ void displayProducts(){
     for (size_t i = 0; i < products.size(); ++i) {
         const auto &p = products[i];
         std::cout << i + 1 << ". " << p.name
+             << " | Category: " << (p.category.empty() ? "-" : p.category)
              << " | Price: $" << std::fixed << std::setprecision(2) << p.price
              << " | Stock: " << p.stock
              << " | Sold: " << p.soldCount << "\n";
+    }
+}
+
+static void printCategoryOptions() {
+    std::cout << "Available categories:\n";
+    for (size_t i = 0; i < PRODUCT_CATEGORIES.size(); ++i) {
+        std::cout << "  " << i + 1 << ". " << PRODUCT_CATEGORIES[i] << "\n";
     }
 }
 
@@ -57,40 +65,59 @@ void displayPendingPackages(){
 
 void addProduct(){
     std::cout << "\n--- Add Product ---\n";
-    std::string name;
-    std::cout << "Product name: ";
-    std::getline(std::cin, name);
-    if (name.empty()) {
-        std::cout << "Name cannot be empty.\n";
-        return;
-    }
-        if (findProduct(name)) {
-        std::cout << "Product already exists.\n";
-        return;
-    }
-    std::string priceInput, stockInput;
-    std::cout << "Price (USD): ";
-    std::getline(std::cin, priceInput);
-    std::cout << "Stock quantity: ";
-    std::getline(std::cin, stockInput);
-    try {
-        double price = stod(priceInput);
-        int stock = stoi(stockInput);
-        if (price < 0 || stock < 0) {
-            std::cout << "Price and stock must be non-negative.\n";
+    std::cout << "How many items do you want to add ? /n";  
+    int cho;
+    std::cin >> cho;
+    while(cho>0){
+        std::string name;
+        std::cout << "Product name: ";
+        std::getline(std::cin, name);
+        if (name.empty()) {
+            std::cout << "Name cannot be empty.\n";
             return;
         }
-        Product p;
-        p.name = name;
-        p.price = price;
-        p.stock = stock;
-        p.soldCount = 0;
-        products.push_back(p);
-        productTrie.build(products);
-        saveProductsToFile();
-        std::cout << "Product added successfully.\n";
-    } catch (...) {
-        std::cout << "Invalid numeric input.\n";
+            if (findProduct(name)) {
+            std::cout << "Product already exists.\n";
+            return;
+        }
+        std::string priceInput, stockInput;
+        std::cout << "Price (USD): ";
+        std::getline(std::cin, priceInput);
+        std::cout << "Stock quantity: ";
+        std::getline(std::cin, stockInput);
+        try {
+            double price = stod(priceInput);
+            int stock = stoi(stockInput);
+            if (price < 0 || stock < 0) {
+                std::cout << "Price and stock must be non-negative.\n";
+                return;
+            }
+
+            std::string categorySelection;
+            std::string resolvedCategory;
+            while (true) {
+                printCategoryOptions();
+                std::cout << "Select category (number or name): ";
+                std::getline(std::cin, categorySelection);
+                if (resolveCategoryInput(categorySelection, resolvedCategory)) {
+                    break;
+                }
+                std::cout << "Invalid category selection. Please try again.\n";
+            }
+
+            Product p;
+            p.name = name;
+            p.price = price;
+            p.stock = stock;
+            p.soldCount = 0;
+            p.category = resolvedCategory;
+            products.push_back(p);
+            productTrie.build(products);
+            saveProductsToFile();
+            std::cout << "Product added successfully.\n";
+        } catch (...) {
+            std::cout << "Invalid numeric input.\n";
+        }
     }
 }
 
@@ -132,7 +159,12 @@ void processNextPackage(){
     std::cout << "Package Score (total items): " << pack->score << "\n";
     std::cout << "Products:\n";
     for (const auto &item : pack->items) {
-        std::cout << "  - " << item.productName << " x" << item.quantity << "\n";
+        Product* prod = findProduct(item.productName);
+        std::cout << "  - " << item.productName;
+        if (prod && !prod->category.empty()) {
+            std::cout << " [" << prod->category << "]";
+        }
+        std::cout << " x" << item.quantity << "\n";
     }  
     
     PathResult route = shortestRouteFromNearestWarehouse(pack->destinationCity);
@@ -181,6 +213,7 @@ void adminMenu(User &adminUser) {
         } else if (choice == "2") {
             addProduct();
         } else if (choice == "3") {
+            displayProducts();
             deleteProduct();
         } else if (choice == "4") {
             displayUsers();
