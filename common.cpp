@@ -45,6 +45,13 @@ const std::unordered_map<char, std::string> CITY_LABELS = {
     {'L', "Trinkleby"}
 };
 
+const std::vector<std::string> PRODUCT_CATEGORIES = {
+    "Book",
+    "Food",
+    "تجهیزات پزشکی",
+    "تجهیزات نقلیه",
+    "دستگاه دیجیتال"
+};
 
 std::string nextOrderId() {
     ++orderSequence;
@@ -180,25 +187,35 @@ std::unordered_map<char, std::vector<std::pair<char, int>>> buildCityGraph() {
     addEdge('A', 'C', 5);
     addEdge('B', 'F', 5);
     addEdge('B', 'A', 2);
-    addEdge('B', 'F', 5);
+    addEdge('C', 'A', 5);
     addEdge('C', 'E', 4);
-    addEdge('C', 'G', 6);
     addEdge('C', 'K', 4);
     addEdge('C', 'L', 3);
-    addEdge('C', 'A', 5);
+    addEdge('C', 'J', 6);
     addEdge('D', 'E', 1);
     addEdge('E', 'F', 2);
     addEdge('E', 'G', 3);
+    addEdge('E', 'C', 4);
+    addEdge('E', 'D', 1);
     addEdge('F', 'H', 3);
     addEdge('F', 'G', 5);
+    addEdge('F', 'B', 5);
+    addEdge('F', 'E', 2);
+    addEdge('G', 'E', 3);
     addEdge('G', 'H', 4);
+    addEdge('G', 'F', 5);
     addEdge('G', 'I', 2);
     addEdge('G', 'J', 4);
     addEdge('G', 'K', 10);
-    addEdge('H', 'I', 4);
-    addEdge('I', 'J', 2);
+    addEdge('H', 'F', 3);
+    addEdge('H', 'G', 4);
+    addEdge('I', 'G', 2);
+    addEdge('J', 'C', 6);
+    addEdge('J', 'G', 4);
     addEdge('J', 'K', 8);
-    addEdge('K', 'L', 3);
+    addEdge('K', 'C', 4);
+    addEdge('K', 'J', 8);
+    addEdge('L', 'C', 3);
 
     return graph;
 }
@@ -361,4 +378,47 @@ bool PackageLess(const Package* a, const Package* b) {
 bool PackageComparator::operator()(Package* a, Package* b) const {
     if (a->score != b->score) return a->score < b->score; 
     return a->enqueueIndex > b->enqueueIndex; 
+}
+
+std::string toUpperCopy(const std::string &input) {
+    std::string result;
+    result.reserve(input.size());
+    for (char ch : input) {
+        result.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(ch))));
+    }
+    return result;
+}
+
+bool equalsIgnoreCase(const std::string &a, const std::string &b) {
+    return toUpperCopy(a) == toUpperCopy(b);
+}
+
+
+bool resolveCategoryInput(const std::string &input, std::string &resolvedCategory) {
+    std::string candidate = trim(input);
+    if (candidate.empty()) return false;
+
+    bool numeric = std::all_of(candidate.begin(), candidate.end(), [](unsigned char ch) {
+        return std::isdigit(ch);
+    });
+
+    if (numeric) {
+        try {
+            size_t idx = std::stoul(candidate);
+            if (idx >= 1 && idx <= PRODUCT_CATEGORIES.size()) {
+                resolvedCategory = PRODUCT_CATEGORIES[idx - 1];
+                return true;
+            }
+        } catch (...) {
+            // fall through to string matching
+        }
+    }
+    for (const auto &category : PRODUCT_CATEGORIES) {
+        if (equalsIgnoreCase(category, candidate)) {
+            resolvedCategory = category;
+            return true;
+        }
+    }
+
+    return false;
 }

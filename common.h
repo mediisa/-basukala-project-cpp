@@ -22,7 +22,7 @@ extern const std::string PACKAGES_FILE;
 
 extern const std::vector<char> WAREHOUSE_CITIES;
 extern const std::unordered_map<char, std::string> CITY_LABELS;
-
+extern const std::vector<std::string> PRODUCT_CATEGORIES;
 
 
 struct OrderItem {
@@ -36,6 +36,7 @@ struct Product {
     double price = 0.0;
     int stock = 0;
     int soldCount = 0;
+    std::string category;
 };
 
 struct OrderRecord {
@@ -129,7 +130,9 @@ std::string formatRouteDisplay(const std::vector<char> &path, int distance);
 
 void refreshUserHistoryStatus(User &user);
 
-
+std::string toUpperCopy(const std::string &input);
+bool equalsIgnoreCase(const std::string &a, const std::string &b);
+bool resolveCategoryInput(const std::string &input, std::string &resolvedCategory);
 
 extern std::vector<User> users;
 extern std::vector<Product> products;
