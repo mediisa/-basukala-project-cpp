@@ -4,6 +4,35 @@
 #include <iomanip>
 #include <algorithm>
 
+
+static void printCategoryOptions() {
+    std::cout << "Categories:\n";
+    for (size_t i = 0; i < PRODUCT_CATEGORIES.size(); ++i) {
+        std::cout << "  " << i + 1 << ". " << PRODUCT_CATEGORIES[i] << "\n";
+    }
+}
+
+static void displayProductsByCategory(const std::string &categoryFilter) {
+    bool filtered = !categoryFilter.empty();
+    int counter = 0;
+    for (const auto &product : products) {
+        if (filtered && !equalsIgnoreCase(product.category, categoryFilter)) continue;
+        ++counter;
+        std::cout << counter << ". " << product.name
+             << " | Category: " << (product.category.empty() ? "-" : product.category)
+             << " | Price: $" << std::fixed << std::setprecision(2) << product.price
+             << " | Stock: " << product.stock
+             << " | Sold: " << product.soldCount << "\n";
+    }
+    if (counter == 0) {
+    if (filtered) {
+            std::cout << "No products found in the selected category.\n";
+        } else {
+            std::cout << "No products available.\n";
+        }
+    }
+}
+
 void searchProductsWithSuggestions(){
     std::cout << "\n--- Product Search ---\n";
     std::string query;
@@ -17,8 +46,14 @@ void searchProductsWithSuggestions(){
     }
     std::cout << "Suggestions (prefix match):\n";
     for (size_t i = 0; i < suggestions.size(); ++i) {
-        std::cout << i + 1 << ". " << suggestions[i] << "\n";
+        std::cout << i + 1 << ". " << suggestions[i];
+        Product* product = findProduct(suggestions[i]);
+        if (product && !product->category.empty()) {
+            std::cout << " | Category: " << product->category;
+        }
+        std::cout << "\n";
     }
+
 }
 
 Product* selectProductByName(){
@@ -26,55 +61,66 @@ Product* selectProductByName(){
     std::cout << "Enter product name: ";
     std::getline(std::cin, name);
     Product* product = findProduct(name);
-    if (!product) std::cout << "Product not found.\n";
+    if (!product) {
+        std::cout << "Product not found.\n";
+        return nullptr;
+    }
+    std::cout << "Selected: " << product->name
+              << " | Category: " << (product->category.empty() ? "-" : product->category)
+              << " | Price: $" << std::fixed << std::setprecision(2) << product->price << "\n";
     return product;
 }
 
 void addToCart(std::vector<OrderItem> &cart){
     std::cout << "\n--- Add to Cart ---\n";
-    Product* product = selectProductByName();
-    if (!product) return;
-    if (product->stock <= 0) {
-        std::cout << "Product out of stock.\n";
-        return;
-    }
-    std::string qtyInput;
-    std::cout << "Quantity: ";
-    std::getline(std::cin, qtyInput);
-    int qty = 0;
-    try {
-        qty = stoi(qtyInput);
-    } catch (...) {
-        std::cout << "Invalid quantity.\n";
-        return;
-    }
-    if (qty <= 0) {
-        std::cout << "Quantity must be positive.\n";
-        return;
-    }
-    if (qty > product->stock) {
-        std::cout << "Insufficient stock. Available: " << product->stock << "\n";
-        return;
-    }
-
-    for (auto &item : cart) {
-        if (item.productName == product->name) {
-            if (item.quantity + qty > product->stock) {
-                std::cout << "Total quantity exceeds available stock.\n";
-                return;
-            }
-            item.quantity += qty;
-            std::cout << "Updated cart entry.\n";
+    std::cout << "How many items do you want to add to the shopping cart? /n";
+    int cho;
+    std::cin>>cho;
+    while(cho>0){
+        Product* product = selectProductByName();
+        if (!product) return;
+        if (product->stock <= 0) {
+            std::cout << "Product out of stock.\n";
             return;
         }
-    }
+        std::string qtyInput;
+        std::cout << "Quantity: ";
+        std::getline(std::cin, qtyInput);
+        int qty = 0;
+        try {
+            qty = stoi(qtyInput);
+        } catch (...) {
+            std::cout << "Invalid quantity.\n";
+            return;
+        }
+        if (qty <= 0) {
+            std::cout << "Quantity must be positive.\n";
+            return;
+        }
+        if (qty > product->stock) {
+            std::cout << "Insufficient stock. Available: " << product->stock << "\n";
+            return;
+        }
 
-    OrderItem newItem;
-    newItem.productName = product->name;
-    newItem.quantity = qty;
-    newItem.unitPrice = product->price;
-    cart.push_back(newItem);
-    std::cout << "Added to cart.\n";
+        for (auto &item : cart) {
+            if (item.productName == product->name) {
+                if (item.quantity + qty > product->stock) {
+                    std::cout << "Total quantity exceeds available stock.\n";
+                    return;
+                }
+                item.quantity += qty;
+                std::cout << "Updated cart entry.\n";
+                return;
+            }
+        }
+
+        OrderItem newItem;
+        newItem.productName = product->name;
+        newItem.quantity = qty;
+        newItem.unitPrice = product->price;
+        cart.push_back(newItem);
+        std::cout << "Added to cart.\n";
+    }
 }
 
 void removeFromCart(std::vector<OrderItem> &cart){
@@ -106,10 +152,13 @@ void displayCart(const std::vector<OrderItem> &cart){
     int totalItems = 0;
     for (size_t i = 0; i < cart.size(); ++i) {
         const auto &item = cart[i];
+        Product* product = findProduct(item.productName);
+        std::string category = product ? product->category : "-";
         double lineTotal = item.quantity * item.unitPrice;
         subtotal += lineTotal;
         totalItems += item.quantity;
         std::cout << i + 1 << ". " << item.productName
+             << " | Category: " << category
              << " | Quantity: " << item.quantity
              << " | Unit Price: $" << std::fixed << std::setprecision(2) << item.unitPrice
              << " | Line Total: $" << lineTotal << "\n";
@@ -236,6 +285,7 @@ void addFunds(User &user){
 
 void customerMenu(User &user){
 std::vector<OrderItem> cart;
+std::string cho , up;
     while (true) {
         std::cout << "\n=== Customer Menu ===\n"
              << "1. View Products\n"
@@ -250,24 +300,35 @@ std::vector<OrderItem> cart;
              << "Select an option: ";
         std::string choice;
         std::getline(std::cin, choice);
+        up=toUpperCopy(choice);
         if (choice == "1") {
             std::cout << "\n--- Product Catalog ---\n";
             if (products.empty()) {
                 std::cout << "No products available.\n";
             } else {
-                for (size_t i = 0; i < products.size(); ++i) {
-                    const auto &p = products[i];
-                    std::cout << i + 1 << ". " << p.name
-                         << " | Price: $" << std::fixed << std::setprecision(2) << p.price
-                         << " | Stock: " << p.stock
-                         << " | Sold: " << p.soldCount << "\n";
+                printCategoryOptions();
+                std::cout << "Filter by category (number or name, Enter for all): ";
+                std::string categoryInput;
+                std::getline(std::cin, categoryInput);
+                std::string resolvedCategory;
+                if (!categoryInput.empty() && !resolveCategoryInput(categoryInput, resolvedCategory)) {
+                    std::cout << "Invalid category selection. Showing all categories.\n";
+                    resolvedCategory.clear();
                 }
+                displayProductsByCategory(resolvedCategory);
             }
         } else if (choice == "2") {
             searchProductsWithSuggestions();
+                if (askYesNo("Do you want to add a product from these suggestions? (Y/N): ")) {
+                    addToCart(cart);
+                }
         } else if (choice == "3") {
             addToCart(cart);
+            if(askYesNo("Do you want to settle the bill ?(Y/N) \n")){
+                checkout(user, cart);
+            }
         } else if (choice == "4") {
+            displayCart(cart);
             removeFromCart(cart);
         } else if (choice == "5") {
             displayCart(cart);
