@@ -31,6 +31,10 @@ public:
     void reduceStock(int qty);
     void addStock(int qty);
     void addSold(int qty);
+
+    void setPrice(double p);
+    void setName(const std::string& n);
+    void setCategory(const std::string& c);
 };
 
 class Order {
