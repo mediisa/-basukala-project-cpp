@@ -34,6 +34,18 @@ void Product::addSold(int qty) {
     soldCount += qty;
 }
 
+void Product::setPrice(double p) {
+    price = p;
+}
+
+void Product::setName(const std::string& n) {
+    name = n;
+}
+
+void Product::setCategory(const std::string& c) {
+    category = c;
+}
+
 // ---------------- Order ----------------
 
 Order::Order()
