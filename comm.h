@@ -2,12 +2,14 @@
 #define COMM_H
 
 #include "Models.h"
+#include "ProductBST.h"
 #include <string>
 #include <vector>
 
 
 extern std::vector<User> users;
-extern std::vector<Product> products;
+//extern std::vector<Product> products;
+extern ProductBST productCatalog;
 extern std::vector<Order> orders;
 extern std::vector<Package> packages;
 
@@ -23,13 +25,13 @@ namespace Common {
     extern const std::string PACKAGES_FILE;
 
     extern const std::vector<std::string> PRODUCT_CATEGORIES;
+    std::string promptLine(const std::string& prompt);
 
     std::vector<std::string> split(const std::string& line, char delimiter);
     std::string join(const std::vector<std::string>& items, char delimiter);
     std::string trim(const std::string& s);
 
-    std::string encodeOrderItems(const std::vector<OrderItem>& items);
-    std::vector<OrderItem> decodeOrderItems(const std::string& encoded);
+
 
     std::string toUpperCopy(const std::string& input);
     bool equalsIgnoreCase(const std::string& a, const std::string& b);
@@ -37,7 +39,7 @@ namespace Common {
 
     void setOrderSequence(int value);
     void setPackageSequence(int value);
-    int getOrderSequence();
+    //int getOrderSequence();
     int getPackageSequence();
 
 
