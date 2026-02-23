@@ -13,16 +13,13 @@ public:
 
 private:
     UserService& userService_;
-    std::string promptLine(const std::string& prompt);
     bool tryParseInt(const std::string& s, int& out);
 
     void displayProducts();
     void printCategoryOptions();
     void displayProductsByCategorySorted(const std::string& categoryFilter);
     void selectProductByCategoryByNumber();
-    void displayTopSellingProduct();
-    void displayByName();
-    void displayByPriceProduct();
+    void displayByTopSellingNamePriceProduct(int choice);
 
     void displayUsers();
 
