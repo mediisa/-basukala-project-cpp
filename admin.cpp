@@ -15,13 +15,6 @@
 AdminService::AdminService(UserService& userService)
     : userService_(userService) {}
 
-std::string AdminService::promptLine(const std::string& prompt) {
-    std::cout << prompt;
-    std::string input;
-    std::getline(std::cin, input);
-    return input;
-}
-
 bool AdminService::tryParseInt(const std::string& s, int& out) {
     try {
         size_t idx = 0;
@@ -49,11 +42,11 @@ void AdminService::displayProducts() {
         if( m == "1"){
             selectProductByCategoryByNumber();
         }else if( m == "2"){
-            displayTopSellingProduct();
+            displayByTopSellingNamePriceProduct(1);
         }else if( m == "3"){
-            displayByName();
+            displayByTopSellingNamePriceProduct(2);
         }else if( m == "4"){
-            displayByPriceProduct();
+            displayByTopSellingNamePriceProduct(3);
         }else if( m == "5"){
             return;
         }else{
@@ -69,14 +62,18 @@ void AdminService::printCategoryOptions() {
 }
 
 void AdminService::displayProductsByCategorySorted(const std::string& categoryFilter) {
-    std::vector<Product*> list;
-    for (auto& p : products) {
-        if (!categoryFilter.empty() && !Common::equalsIgnoreCase(p.category, categoryFilter)) continue;
-        list.push_back(&p);
-    }
+    std::vector<Product> list;
 
-    std::sort(list.begin(), list.end(), [](const Product* a, const Product* b) {
-        return Common::toUpperCopy(a->name) < Common::toUpperCopy(b->name);
+    if (!categoryFilter.empty()){
+        list = productCatalog.getCategoryProducts(categoryFilter);
+    }else{
+        list = productCatalog.toVector();
+    }
+        
+
+
+    std::sort(list.begin(), list.end(), [](const Product& a, const Product& b) {
+        return Common::toUpperCopy(a.getname()) < Common::toUpperCopy(b.getname());
     });
 
     if (list.empty()) {
@@ -86,25 +83,25 @@ void AdminService::displayProductsByCategorySorted(const std::string& categoryFi
     }
 
     for (size_t i = 0; i < list.size(); ++i) {
-        const auto* product = list[i];
-        std::cout << i  << ". " << product->name
-                  << " | Category: " << (product->category.empty() ? "-" : product->category)
-                  << " | Price: $" << std::fixed << std::setprecision(2) << product->price 
-                  << " | Stock: " << product->stock 
-                  << " | Sold: " << product->soldCount <<" \n";
+        const auto& product = list[i];
+        std::cout << i  << ". " << product.getname()
+                  << " | Category: " << (product.getcategory().empty() ? "-" : product.getcategory())
+                  << " | Price: $" << std::fixed << std::setprecision(2) << product.getprice() 
+                  << " | Stock: " << product.getstock() 
+                  << " | Sold: " << product.getsoldCount() <<" \n";
     }
 
     return ;
 }
 
 void AdminService::selectProductByCategoryByNumber() {
-    if (products.empty()) {
+    if (productCatalog.toVector().empty()) {
         std::cout << "No products available.\n";
         return ;
     }
 
     printCategoryOptions();
-    std::string categoryInput = promptLine("Filter by category (number or name, Enter for all): ");
+    std::string categoryInput = Common::promptLine("Filter by category (number or name, Enter for all): ");
     std::string resolvedCategory;
 
     if (!categoryInput.empty() && !Common::resolveCategoryInput(categoryInput, resolvedCategory)) {
@@ -116,78 +113,36 @@ void AdminService::selectProductByCategoryByNumber() {
 
 }
 
-void AdminService::displayTopSellingProduct(){
-    if (products.empty()) {
+void AdminService::displayByTopSellingNamePriceProduct(int choice){
+    auto sorted = productCatalog.toVector();
+    if (sorted.empty()) {
         std::cout << "No products available.\n";
         return;
     }
 
     std::cout << "\n ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ \n";
 
-    auto sorted = products;
     std::sort(sorted.begin() , sorted.end() , 
-            [](const Product& a , const Product& b){
-                return a.soldCount > b.soldCount;
+            [&choice](const Product& a , const Product& b){
+                if(choice == 1){
+                    return a.getsoldCount() > b.getsoldCount();
+                }else if(choice == 2){
+                    return a.getname() < b.getname();
+                }else if(choice == 3){
+                    return a.getprice() > b.getprice();
+                }else{
+                    return false;
+                }
             });
 
 
-    for (size_t i=0 ; i < products.size() ; ++i){
+    for (size_t i=0 ; i < sorted.size() ; ++i){
         const auto& p = sorted[i];
-        std::cout << i+1 << ". "<<p.name
-                  << " | Price: $"<< std::fixed << std::setprecision(2) << p.price
-                  << " | Category: "<<p.category 
-                  << " | Stock: " << p.stock 
-                  << " | Sold: " << p.soldCount <<" \n";
-    }
-}
-
-void AdminService::displayByName(){
-    if (products.empty()) {
-        std::cout << "No products available.\n";
-        return;
-    }
-
-    std::cout << "\n ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ \n";
-
-    auto sorted = products;
-    std::sort(sorted.begin() , sorted.end() , 
-            [](const Product& a , const Product& b){
-                return a.name < b.name;
-            });
-
-
-    for (size_t i=0 ; i < products.size() ; ++i){
-        const auto& p = sorted[i];
-        std::cout << i+1 << ". "<<p.name
-                  << " | Price: $"<< std::fixed << std::setprecision(2) << p.price
-                  << " | Category: "<<p.category 
-                  << " | Stock: " << p.stock 
-                  << " | Sold: " << p.soldCount <<" \n";
-    }
-}
-
-void AdminService::displayByPriceProduct(){
-    if (products.empty()) {
-        std::cout << "No products available.\n";
-        return;
-    }
-
-    std::cout << "\n ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ \n";
-
-    auto sorted = products;
-    std::sort(sorted.begin() , sorted.end() , 
-            [](const Product& a , const Product& b){
-                return a.price > b.price;
-            });
-
-
-    for (size_t i=0 ; i < products.size() ; ++i){
-        const auto& p = sorted[i];
-        std::cout << i+1 << ". "<<p.name
-                  << " | Price: $"<< std::fixed << std::setprecision(2) << p.price
-                  << " | Category: "<<p.category 
-                  << " | Stock: " << p.stock 
-                  << " | Sold: " << p.soldCount <<" \n";
+        std::cout << i+1 << ". "<<p.getname()
+                  << " | Price: $"<< std::fixed << std::setprecision(2) << p.getprice()
+                  << " | Category: "<<p.getcategory()
+                  << " | Stock: " << p.getstock() 
+                  << " | Sold: " << p.getsoldCount() <<" \n";
     }
 }
 
@@ -197,15 +152,15 @@ void AdminService::displayUsers() {
     auto sorted = users;
     std::sort(sorted.begin() , sorted.end() , 
             [](const User& a , const User& b){
-                return a.username < b.username;
+                return a.getusername() < b.getusername();
             });
 
     for (size_t i=0 ; i < users.size() ; ++i) {
         const auto& u = sorted[i];
-        std::cout << "Username: " << u.username
-                  << " | Role: " << u.role
-                  << " | Balance: $" << std::fixed << std::setprecision(2) << u.balance
-                  << " | Score: " << u.score << "\n";
+        std::cout << "Username: " << u.getusername()
+                  << " | Role: " << u.getrole()
+                  << " | Balance: $" << std::fixed << std::setprecision(2) << u.getbalance()
+                  << " | Score: " << u.getscore() << "\n";
     }
 }
 
@@ -237,9 +192,9 @@ void AdminService::displayPendingPackages() {
 
 void AdminService::addProduct() {
     std::cout << "\n--- Add Product ---\n";
-    std::string countInput;
-    std::cout << "How many items do you want to add ? \n";
-    std::getline(std::cin, countInput);
+    std::string countInput = Common::promptLine("How many items do you want to add ? \n");
+    //std::cout << ;
+    //std::getline(std::cin, countInput);
 
     int cho = 0;
     try {
@@ -255,7 +210,7 @@ void AdminService::addProduct() {
     }
 
     while (cho > 0) {
-        std::string name = promptLine("Product name: ");
+        std::string name = Common::promptLine("Product name: ");
 
         if (name.empty()) {
             std::cout << "Name cannot be empty.\n";
@@ -265,18 +220,19 @@ void AdminService::addProduct() {
         if (Common::findProduct(name)) {
             std::cout << "Product already exists.\n";
             while(true){
-                std::string input = promptLine("Do you want edit ?(Y/N) \n");
-                if(Common::toUpperCopy(input) == "Y" ){ editProduct(); return;}
+                std::string input = Common::promptLine("Do you want edit ?(Y/N) \n");
+                if(Common::toUpperCopy(input) == "Y" ){ editProduct(); break;}
                 else if(Common::toUpperCopy(input) == "N"){ return;}
                 std::cout << "Please enter the Y/y or N/n.  ";
             }
         }
 
-        std::string priceInput, stockInput;
-        std::cout << "Price (USD): ";
-        std::getline(std::cin, priceInput);
-        std::cout << "Stock quantity: ";
-        std::getline(std::cin, stockInput);
+        std::string priceInput = Common::promptLine("Price (USD): ");
+        std::string  stockInput = Common::promptLine("Stock quantity: ");
+        //std::cout << "Price (USD): ";
+        //std::getline(std::cin, priceInput);
+        //std::cout << "Stock quantity: ";
+        //std::getline(std::cin, stockInput);
 
         try {
             double price = std::stod(priceInput);
@@ -298,15 +254,10 @@ void AdminService::addProduct() {
                 std::cout << "Invalid category selection. Please try again.\n";
             }
 
-            Product p;
-            p.name = name;
-            p.price = price;
-            p.stock = stock;
-            p.soldCount = 0;
-            p.category = resolvedCategory;
+            Product p(name,resolvedCategory,price,stock);
 
-            products.push_back(p);
-            productTrie.build(products);
+            productCatalog.insert(p);
+            productTrie.build(productCatalog.toVector());
             wrFileService.saveProductsToFile();
 
             std::cout << "Product added successfully.\n";
@@ -320,20 +271,23 @@ void AdminService::addProduct() {
 
 void AdminService::deleteProduct() {
     std::cout << "\n--- Delete Product ---\n";
-    std::string name;
-    std::cout << "Product name to delete: ";
-    std::getline(std::cin, name);
+    std::string name = Common::promptLine("Product name to delete: ");
+    //std::cout << ;
+    //std::getline(std::cin, name);
 
-    for (auto it = products.begin(); it != products.end(); ++it) {
-        if (Common::equalsIgnoreCase(it->name , name)) {
-            products.erase(it);
-            productTrie.build(products);
-            wrFileService.saveProductsToFile();
-            std::cout << "Product removed.\n";
-            return;
-        }
+    Product* prod = Common::findProduct(name);
+    if(!prod){
+        std::cout << "Product not found.\n"; return;
     }
-    std::cout << "Product not found.\n";
+
+    std::string oldCategory = prod->getcategory();
+    std::string oldName = prod->getname();
+
+    productCatalog.remove(oldCategory, oldName);
+    productTrie.build(productCatalog.toVector());
+    wrFileService.saveProductsToFile();
+    std::cout << "Product removed.\n";
+
 }
 
 void AdminService::editProduct() {
@@ -341,7 +295,12 @@ void AdminService::editProduct() {
     std::string name;
     std::cout << "Product name to edit: ";
     std::getline(std::cin, name);
-   
+
+    Product* prod = Common::findProduct(name);
+    if(!prod){
+        std::cout << "Product not found.\n"; return;
+    }
+
     std::cout << "\n--- Modify Product ---\n"
               << "1) Edit price\n"
               << "2) Edit stock quantity\n"
@@ -351,17 +310,16 @@ void AdminService::editProduct() {
               << "Choose: ";
     std::string m;
     std::getline(std::cin, m);
-    for (auto it = products.begin(); it != products.end(); ++it) {
-        if (Common::equalsIgnoreCase(it->name , name)) {
+
             if(m == "1"){
-                std::string input = promptLine("New price: ");
+                std::string input = Common::promptLine("New price: ");
                 try {
                     double newPrice = std::stod(input);
                     if (newPrice < 0) {
                         std::cout << "Price cannot be negative.\n";
                         return;
                     }
-                    it->setPrice(newPrice);
+                    prod->setPrice(newPrice);
                     std::cout << "Price updated successfully.\n";
                     wrFileService.saveProductsToFile();
                     return;
@@ -370,47 +328,64 @@ void AdminService::editProduct() {
                     return;
                 }
             }else if(m == "2"){
-                std::string input = promptLine("Stock quantity change (+/-): ");
+                std::string input = Common::promptLine("Stock quantity change (+/-): ");
                 int delta = 0;
 
                 if(!tryParseInt(input , delta)) {std::cout << "Invalid stock value.\n";  return;}
 
-                if(it->stock + delta < 0) {std::cout << "Stock cannot be negative.\n";  return;}
+                if(prod->getstock() + delta < 0) {std::cout << "Stock cannot be negative.\n";  return;}
 
                 if (delta > 0){
-                    it->addStock(delta);
+                    prod->addStock(delta);
                 }else{
-                    it->reduceStock(-delta);
+                    prod->reduceStock(-delta);
                 }
 
                 std::cout << "Stock quantity updated successfully.\n";
                 wrFileService.saveProductsToFile();
                 return;
             }else if(m == "3"){
-                std::string newName = promptLine("New product name: ");
+                std::string newName = Common::promptLine("New product name: ");
                 if(newName.empty()){
                     std::cout << "Name cannot be empty.\n"; return;
                 }
 
-                it->setName(newName);
-                std::cout << "Name updated successfully.\n";
+                if (Common::findProduct(newName)) {
+                    std::cout << "Another product with this name already exists.\n";
+                    return;
+                }
+
+                Product updated = *prod;
+                std::string oldCategory = prod->getcategory();
+                std::string oldName = prod->getname();
+                updated.setName(newName);
+
+                productCatalog.remove(oldCategory, oldName);
+                productCatalog.insert(updated);
+                productTrie.build(productCatalog.toVector());
                 wrFileService.saveProductsToFile();
+                std::cout << "Name updated successfully.\n";
                 return;
             }else if(m == "4"){
                 printCategoryOptions();
-                std::string input = promptLine("New category (number or name): ");
+                std::string input = Common::promptLine("New category (number or name): ");
                 std::string resolved;
                 if(!Common::resolveCategoryInput(input , resolved)){ std::cout << "Invalid category.\n"; return;}
 
-                it->setCategory(resolved);
+                Product updated = *prod;
+                std::string oldCategory = prod->getcategory();
+                std::string oldName = prod->getname();
+                updated.setCategory(resolved);
+
+                productCatalog.remove(oldCategory, oldName);
+                productCatalog.insert(updated);
+                productTrie.build(productCatalog.toVector());                
                 std::cout << "Categoyr updated successfully.\n";
                 wrFileService.saveProductsToFile();
                 return;
             }else if(m == "5"){
                 return;
             }
-        }
-    }
 
     std::cout << "Product not found.\n";
     return;
@@ -430,23 +405,23 @@ void AdminService::processNextPackage() {
     Package* pack = pq.top();
     pq.pop();
 
-    std::cout << "\n--- Processing Package ---\n";
-    std::cout << "Package ID: " << pack->id << "\n";
-    std::cout << "Order ID: " << pack->orderId << "\n";
-    std::cout << "Customer: " << pack->username << "\n";
-    std::cout << "Destination: " << pack->destinationCity
-              << " (" << CITY_LABELS.at(pack->destinationCity) << ")\n";
-    std::cout << "Address: " << pack->address << "\n";
-    std::cout << "Package Score (total items): " << pack->score << "\n";
-    std::cout << "Products:\n";
+    std::cout << "\n--- Processing Package ---\n"
+              << "Package ID: " << pack->id << "\n"
+              << "Order ID: " << pack->orderId << "\n"
+              << "Customer: " << pack->username << "\n"
+              << "Destination: " << pack->destinationCity
+              << " (" << CITY_LABELS.at(pack->destinationCity) << ")\n"
+              << "Address: " << pack->address << "\n"
+              << "Package Score (total items): " << pack->score << "\n"
+              << "Products:\n";
 
     for (const auto& item : pack->items) {
         Product* prod = Common::findProduct(item.productName);
         std::cout << "  - " << item.productName;
-        if (prod && !prod->category.empty()) {
-            std::cout << " [" << prod->category << "]";
+        if (prod && !prod->getcategory().empty()) {
+            std::cout << " [" << prod->getcategory() << "]";
         }
-        std::cout << " x" << item.quantity << "\n";
+       // std::cout << item.quantity << "\n";
     }
 
     PathResult route = shortestRouteFromNearestWarehouse(pack->destinationCity);
@@ -462,11 +437,12 @@ void AdminService::processNextPackage() {
     std::cout << "Computed Route: " << pack->routeDisplay << "\n";
 
     Order* order = Common::findOrder(pack->orderId);
-    if (order) order->status = "Delivered";
+    if (order) order->setStatus("Delivered");
 
     User* user = Common::findUser(pack->username);
     if (user) {
-        user->score += pack->score;
+        //user->score += pack->score;
+        user->addScore(pack->score);
         userService_.refreshUserHistoryStatus(*user);
     }
 
