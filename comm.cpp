@@ -4,9 +4,11 @@
 #include <iomanip>
 #include <sstream>
 #include <vector>
+#include <iostream>
 
 std::vector<User>    users;
-std::vector<Product> products;
+//std::vector<Product> products;
+ProductBST           productCatalog;
 std::vector<Order>   orders;
 std::vector<Package> packages;
 
@@ -20,15 +22,18 @@ const std::string ORDERS_FILE = "orders.txt";
 const std::string PACKAGES_FILE = "packages.txt";
 
 const std::vector<std::string> PRODUCT_CATEGORIES = {
-    "Book",
-    "Food",
-    "juice",
-    "Medical Equipment",
-    "Electronics"
+    "BOOK", "FOOD AND JUICE", "CLOTHES AND APPAREL", "ELECTRONICS", "OTHER"
 };
 
 static int orderSequence = 0;
 static int packageSequence = 0;
+
+std::string promptLine(const std::string& prompt) {
+    std::cout << prompt;
+    std::string input;
+    std::getline(std::cin, input);
+    return input;
+}
 
 std::vector<std::string> split(const std::string& line, char delimiter) {
     std::vector<std::string> tokens;
@@ -54,36 +59,6 @@ std::string trim(const std::string& s) {
     if (start == std::string::npos) return "";
     size_t end = s.find_last_not_of(" \t\r\n");
     return s.substr(start, end - start + 1);
-}
-
-std::string encodeOrderItems(const std::vector<OrderItem>& items) {
-    std::vector<std::string> segments;
-    for (const auto& item : items) {
-        std::stringstream ss;
-        ss << item.productName << "@"
-           << item.quantity << "@"
-           << std::fixed << std::setprecision(2) << item.unitPrice;
-        segments.push_back(ss.str());
-    }
-    return join(segments, ';');
-}
-
-std::vector<OrderItem> decodeOrderItems(const std::string& encoded) {
-    std::vector<OrderItem> items;
-    if (encoded.empty()) return items;
-
-    std::vector<std::string> tokens = split(encoded, ';');
-    for (const auto& token : tokens) {
-        std::vector<std::string> parts = split(token, '@');
-        if (parts.size() < 3) continue;
-
-        OrderItem item;
-        item.productName = parts[0];
-        item.quantity = std::stoi(parts[1]);
-        item.unitPrice = std::stod(parts[2]);
-        items.push_back(item);
-    }
-    return items;
 }
 
 std::string toUpperCopy(const std::string& input) {
@@ -136,11 +111,11 @@ void setOrderSequence(int value) {
 void setPackageSequence(int value) {
     packageSequence = value;
 }
-
+/*/
 int getOrderSequence() {
     return orderSequence;
 }
-
+*/
 int getPackageSequence() {
     return packageSequence;
 }
@@ -162,7 +137,7 @@ std::string nextPackageId() {
 
 User* findUser(const std::string& username) {
     for (auto& u : users) {
-        if (u.username == username) {
+        if (u.getusername() == username) {
             return &u;
         }
     }
@@ -170,17 +145,12 @@ User* findUser(const std::string& username) {
 }
 
 Product* findProduct(const std::string& name) {
-    for (auto& p : products) {
-        if (equalsIgnoreCase(p.name, name)) {
-            return &p;
-        }
-    }
-    return nullptr;
+    return productCatalog.findGlobal(name);
 }
 
 Order* findOrder(const std::string& orderId) {
     for (auto& o : orders) {
-        if (o.id == orderId) {
+        if (o.getid() == orderId) {
             return &o;
         }
     }
@@ -198,4 +168,3 @@ bool PackageComparator::operator()(Package* a, Package* b) const {
     if (a->score != b->score) return a->score < b->score; 
     return a->enqueueIndex > b->enqueueIndex; 
 }
-
