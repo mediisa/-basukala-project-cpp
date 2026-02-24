@@ -4,36 +4,52 @@
 
 #include <iostream>
 #include <string>
+#include <functional>
+#include <random>
 
-std::string UserService::promptLine(const std::string& prompt) {
-    std::cout << prompt;
-    std::string input;
-    std::getline(std::cin, input);
-    return input;
+std::string UserService::simpleHash(const std::string& input) {
+    return std::to_string(std::hash<std::string>{}(input));
+}
+
+std::string UserService::generateSalt(size_t length ) {
+    static const char charset[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dist(0, sizeof(charset) - 2);
+
+    std::string salt;
+    salt.reserve(length);
+    for (size_t i = 0; i < length; ++i) {
+        salt.push_back(charset[dist(gen)]);
+    }
+    return salt;
 }
 
 User* UserService::login() {
     std::cout << "\n--- Login ---\n";
-    std::string username = promptLine("Username: ");
-    std::string password = promptLine("Password: ");
+    std::string username = Common::promptLine("Username: ");
+    std::string password = Common::promptLine("Password: ");
 
     User* user = Common::findUser(username);
     if (!user) {
         std::cout << "User not found.\n";
         return nullptr;
     }
-    if (user->password != password) {
+  
+    std::string inputHash = simpleHash(password + user->getsalt());
+
+    if (user->getpasswordHash() != inputHash) {
         std::cout << "Invalid password.\n";
         return nullptr;
     }
 
-    std::cout << "Login successful. Welcome, " << user->username << ".\n";
+    std::cout << "Login successful. Welcome, " << user->getusername() << ".\n";
     return user;
 }
 
 bool UserService::registerUser() {
     std::cout << "\n--- Register ---\n";
-    std::string username = promptLine("Choose a username: ");
+    std::string username = Common::promptLine("Choose a username: ");
     if (username.empty()) {
         std::cout << "Username cannot be empty.\n";
         return false;
@@ -44,24 +60,26 @@ bool UserService::registerUser() {
         return false;
     }
 
-    std::string password = promptLine("Enter password: ");
+    std::string password = Common::promptLine("Enter password: ");
     if (password.empty()) {
         std::cout << "Password cannot be empty.\n";
         return false;
     }
-    std::string confirm = promptLine("Confirm password: ");
+    std::string confirm = Common::promptLine("Confirm password: ");
     if (password != confirm) {
         std::cout << "Passwords do not match.\n";
         return false;
     }
-    
-    User u;
-    u.username = username;
+    std::string salt = generateSalt();
+    std::string hash = simpleHash(password + salt);
+    User u (username , salt , password , hash , "customer");
+    //User u (username , password , "customer");
+    /*u.username = username;
     u.password = password;
     u.role = "customer";
     u.balance = 0.0;
     u.score = 0;
-
+*/
     users.push_back(u);
     wrFileService.saveUsersToFile();
 
@@ -91,7 +109,7 @@ std::string UserService::updateStatusInLine(const std::string& line, const std::
 }
 
 void UserService::refreshUserHistoryStatus(User& user) {
-    for (auto& entry : user.orderHistory) {
+    for (auto& entry : user.getorderHistory()) {
         std::string orderId;
         if (!extractOrderId(entry, orderId)) {
             continue;
@@ -100,6 +118,6 @@ void UserService::refreshUserHistoryStatus(User& user) {
         if (!order) {
             continue;
         }
-        entry = updateStatusInLine(entry, order->status);
+        entry = updateStatusInLine(entry, order->getstatus());
     }
 }
