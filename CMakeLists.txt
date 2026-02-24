@@ -4,21 +4,31 @@ project(HorrorCityGame)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-include_directories(D:/basukala/-basukala-project-cpp/include)
+include_directories(D:/basu/include)
 
 
 set(SOURCES
-    admin.cpp
-    common.cpp
-    customer.cpp
+    Admin.cpp
+    comm.cpp
+    Customer.cpp
+    Graph.cpp
+    Models.cpp
+    ProductTrie.cpp
+    ProductBST.cpp
     main.cpp
+    User.cpp
     WRFile.cpp
     )
 
 set(HEADERS
-    admin.h
-    common.h
-    customer.h
+    Admin.h
+    comm.h
+    Customer.h
+    Graph.h
+    Models.h
+    ProductTrie.h
+    ProductBST.h
+    User.h
     WRFile.h
 )
 
