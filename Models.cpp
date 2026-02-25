@@ -1,16 +1,6 @@
 #include "Models.h"
 
-OrderItem::OrderItem()
-    : productName(""), quantity(0), unitPrice(0.0) {}
-
-OrderItem::OrderItem(const std::string& name, int qty, double price)
-    : productName(name), quantity(qty), unitPrice(price) {}
-
-double OrderItem::lineTotal() const {
-    return static_cast<double>(quantity) * unitPrice;
-}
-
-// ---------------- Product ----------------
+//--------------- Product ----------------
 
 Product::Product()
     : name(""), category(""), price(0.0), stock(0), soldCount(0) {}
@@ -46,37 +36,89 @@ void Product::setCategory(const std::string& c) {
     category = c;
 }
 
+std::string Product::getname() const {
+    return name;
+}
+std::string Product::getcategory() const{
+    return category;
+}
+double Product::getprice() const{
+    return price;
+}
+int Product::getstock() const{
+    return stock;
+}
+int Product::getsoldCount() const{
+    return soldCount;
+}
+
+
 // ---------------- Order ----------------
 
-Order::Order()
-    : id(""), username(""), totalCost(0.0), destinationCity('A'), address(""), status("Pending") {}
+Order::Order(const std::string& id , const std::string& username , const std::vector<OrderItem>& items , 
+            const double& totalCost , const char& destinationCity , const std::string& address , const std::string& status)
+            : id(id),
+            username(username),
+            items(items),
+            totalCost(totalCost),
+            destinationCity(destinationCity),
+            address(address),
+            status(status) {}
 
-int Order::totalItems() const {
-    int sum = 0;
-    for (const auto& it : items) {
-        sum += it.quantity;
-    }
-    return sum;
+Order::Order(const std::string& id , const std::string& username , const std::vector<OrderItem>& items ,
+             const char& destinationCity , const std::string& address , const std::string& status)
+            : id(id),
+            username(username),
+            items(items),
+            destinationCity(destinationCity),
+            address(address),
+            status(status) {}
+
+std::string Order::getid() const{
+    return id;
 }
-
-double Order::subtotal() const {
-    double sum = 0.0;
-    for (const auto& it : items) {
-        sum += it.lineTotal();
-    }
-    return sum;
+std::string Order::getusername() const{
+    return username;
 }
-
-void Order::recomputeTotal(double shippingCost) {
-    totalCost = subtotal() + shippingCost;
+std::vector<OrderItem> Order::getitems() const{
+    return items;
 }
-
+double Order::gettotalCost() const{
+    return totalCost;    
+}
+char Order::getdestinationCity() const{
+    return destinationCity;
+}
+std::string Order::getaddress() const{
+    return address;
+}
+std::string Order::getstatus() const{
+    return status;
+}
+void Order::settotalCost(double newtotalCost) {
+    totalCost = newtotalCost;
+}
+void Order::setStatus(std::string newstatus){
+    status = newstatus;
+}
 // ---------------- Package ----------------
 
 Package::Package()
     : id(""), orderId(""), username(""), destinationCity('A'), address(""),
       score(0), status("Pending"), routeDisplay(""), routeDistance(0), enqueueIndex(0) {}
 
+Package::Package(const std::string& id , const std::string& orderId , const std::string& username ,
+                const std::vector<OrderItem>& items , const char& destinationCity , const std::string& address ,
+                const std::string& status , const std::string& routeDisplay){
+                    this->id = id;
+                    this->orderId = orderId;
+                    this->username = username;
+                    this->items = items;
+                    this->destinationCity = destinationCity;
+                    this->address = address;
+                    this->status = status;
+                    this->routeDisplay = routeDisplay;
+                }
 int Package::computeScoreFromItems() const {
     int sum = 0;
     for (const auto& it : items) {
@@ -90,6 +132,55 @@ void Package::updateRoute(const std::string& routeText, int distance) {
     routeDistance = distance;
 }
 
+std::string Package::getid() const{
+    return id;
+}
+std::string Package::getorderId() const{
+    return orderId;
+}
+std::string Package::getusername() const{
+    return username;
+}
+std::vector<OrderItem> Package::getitems() const{
+    return items;
+}
+char Package::getdestinationCity() const{
+    return destinationCity;
+}
+std::string Package::getaddress() const{
+    return address;
+}
+int Package::getscore() const{
+    return score;
+}
+std::string Package::getstatus() const{
+    return status;
+}
+std::string Package::getrouteDisplay() const{
+    return routeDisplay;
+}
+int Package::getrouteDistance() const{
+    return routeDistance;
+}
+long long Package::getenqueueIndex() const{
+    return enqueueIndex;
+}
+
+void Package::setstatus(std::string newstatus){
+    status = newstatus;
+}
+void Package::setrouteDistance(int newrouteDistance){
+    routeDistance = newrouteDistance;
+}
+void Package::setenqueueIndex(long long newenqueueIndex){
+    enqueueIndex = newenqueueIndex;
+}
+void Package::setrouteDisplay(std::string newrouteDisplay){
+    routeDisplay = newrouteDisplay;
+}
+void Package::setscore(int newscore){
+    score = newscore;
+}
 //------------------ USER ----------------
 
 User::User() {
@@ -100,10 +191,56 @@ User::User() {
     score = 0;
 }
 
-User::User(const std::string& username, const std::string& password, const std::string& role) {
+User::User(const std::string& username, const std::string& password, const std::string& passwordHash, const std::string& role) {
     this->username = username;
     this->password = password;
+    this->passwordHash = passwordHash;
+    this->salt = "";
     this->role = role;
     this->balance = 0.0;
     this->score = 0;
 }
+User::User(const std::string& username, const std::string& salt, const std::string& password, const std::string& passwordHash, const std::string& role) {
+    this->username = username;
+    this->password = password;
+    this->passwordHash = passwordHash;
+    this->salt = salt;
+    this->role = role;
+    this->balance = 0.0;
+    this->score = 0;  
+}
+
+std::string User::getusername() const{
+    return username;
+}
+std::string User::getpassword() const{
+    return password;
+}
+std::string User::getpasswordHash() const{
+    return passwordHash;
+}
+std::string User::getsalt() const{
+    return salt;
+}
+std::string User::getrole() const{
+    return role;
+}
+double User::getbalance() const{
+    return balance;
+}
+int User::getscore() const{
+    return score;
+}
+std::vector<std::string> User::getorderHistory() const{
+    return orderHistory;
+}
+void User::reduceBlance(int qty) {
+    balance -= qty;
+}
+void User::addBlance(int qty) {
+    balance += qty;
+}
+void User::addScore(int qty) {
+    score += qty;
+}
+
