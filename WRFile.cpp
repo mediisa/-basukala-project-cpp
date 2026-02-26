@@ -1,4 +1,6 @@
 #include "WRFile.h"
+#include "ProductTrie.h"
+#include "User.h"
 #include <fstream>
 #include <iomanip>
 #include <algorithm>
@@ -10,18 +12,16 @@ long long globalPackageSequence = 0;
 void WRFileService::ensureDefaultAdmin() {
     bool hasAdmin = false;
     for (const auto& u : users) {
-        if (Common::equalsIgnoreCase(u.username, "admin") && u.role == "ADMIN") {
+        if (Common::equalsIgnoreCase(u.getusername(), "admin") && u.getrole() == "ADMIN") {
             hasAdmin = true;
             break;
         }
     }
     if (!hasAdmin) {
-        User admin;
-        admin.username = "admin";
-        admin.password = "admin123";
-        admin.role = "ADMIN";
-        admin.balance = 0.0;
-        admin.score = 0;
+        UserService us;
+        std::string salt = us.generateSalt(8);
+        std::string hash = us.simpleHash(std::string("admin1220") + salt);
+        User admin("Admin" , salt , "admin1220" , hash , "ADMIN");
         users.push_back(admin);
     }
 }
@@ -37,8 +37,38 @@ int WRFileService::extractNumericSuffix(const std::string& id) {
     }
 }
 
+std::string WRFileService::encodeOrderItems(const std::vector<OrderItem>& items) {
+    std::vector<std::string> segments;
+    for (const auto& item : items) {
+        std::stringstream ss;
+        ss << item.productName << "@"
+           << item.quantity << "@"
+           << std::fixed << std::setprecision(2) << item.unitPrice;
+        segments.push_back(ss.str());
+    }
+    return Common::join(segments, ';');
+}
+
+std::vector<OrderItem> WRFileService::decodeOrderItems(const std::string& encoded) {
+    std::vector<OrderItem> items;
+    if (encoded.empty()) return items;
+
+    std::vector<std::string> tokens = Common::split(encoded, ';');
+    for (const auto& token : tokens) {
+        std::vector<std::string> parts = Common::split(token, '@');
+        if (parts.size() < 3) continue;
+
+        OrderItem item;
+        item.productName = parts[0];
+        item.quantity = std::stoi(parts[1]);
+        item.unitPrice = std::stod(parts[2]);
+        items.push_back(item);
+    }
+    return items;
+}
+
 void WRFileService::loadUsersFromFile() {
-    //users.clear();
+    users.clear();
 
     std::ifstream fin(Common::USERS_FILE);
     if (!fin.is_open()) {
@@ -52,34 +82,35 @@ void WRFileService::loadUsersFromFile() {
         if (line.empty()) continue;
 
         std::vector<std::string> parts = Common::split(line, '|');
-        if (parts.size() < 5) continue;
+        if (parts.size() < 7) continue;
 
-        User user;
-        user.username = parts[0];
-        user.password = parts[1];
-        user.role = parts[2];
+        User user(parts[0]  , parts[1] , parts[2] ,parts[3] , parts[4]);
 
+        double balance = 0.0;
+        int score = 0;      
         try {
-            user.balance = std::stod(parts[3]);
+            balance = std::stod(parts[5]);
         } catch (...) {
-            user.balance = 0.0;
+            balance = 0.0;
         }
 
         try {
-            user.score = std::stoi(parts[4]);
+            score = std::stoi(parts[6]);
         } catch (...) {
-            user.score = 0;
+            score = 0;
         }
 
-       users.push_back(user);
-       if (parts.size() >= 6) {
-            auto historyItems = Common::split(parts[5], ';');
+        user.addBlance(balance);
+        user.addScore(score);
+        users.push_back(user);
+       /*if (parts.size() >= 8) {
+            auto historyItems = Common::split(parts[6], ';');
             for (const auto& h : historyItems){
                 if (!h.empty()){
                     user.orderHistory.push_back(h);
                 }
             }    
-        }
+        }*/
     }
 
     fin.close();
@@ -89,14 +120,16 @@ void WRFileService::saveUsersToFile() {
     std::ofstream fout(Common::USERS_FILE, std::ios::trunc);
     for (size_t i = 0; i < users.size(); ++i) {
         const auto& u = users[i];
-        std::string histEncoded = Common::join(u.orderHistory, ';');
+        //std::string histEncoded = Common::join(u.orderHistory, ';');
 
-        fout << u.username << "|"
-             << u.password << "|"
-             << u.role << "|"
-             << std::fixed << std::setprecision(2) << u.balance << "|"
-             << u.score << "|"
-             << histEncoded;
+        fout << u.getusername() << "|"
+             << u.getsalt() << "|"
+             << u.getpassword() << "|"
+             << u.getpasswordHash() << "|"
+             << u.getrole() << "|"
+             << std::fixed << std::setprecision(2) << u.getbalance() << "|"
+             << u.getscore() << "|";
+             //<< histEncoded;
 
         if (i + 1 < users.size()) fout << "\n";
     }
@@ -104,12 +137,14 @@ void WRFileService::saveUsersToFile() {
 }
 
 void WRFileService::loadProductsFromFile() {
-    products.clear();
+    productCatalog.toVector().clear();
 
     std::ifstream fin(Common::PRODUCTS_FILE);
     if (!fin.is_open()) return;
 
-    std::string line;
+    std::string line , category = "OTHER";
+    int stock , soldCount;
+    double price;
     while (std::getline(fin, line)) {
         line = Common::trim(line);
         if (line.empty()) continue;
@@ -117,81 +152,57 @@ void WRFileService::loadProductsFromFile() {
         std::vector<std::string> parts = Common::split(line, '|');
         if (parts.size() < 4) continue;
 
-        Product p;
-        p.name = parts[0];
+       
+        std::string name = parts[0];
 
         try {
-            p.price = std::stod(parts[1]);
+            price = std::stod(parts[1]);
         } catch (...) {
-            p.price = 0.0;
+            price = 0.0;
         }
 
         try {
-            p.stock = std::stoi(parts[2]);
+            stock = std::stoi(parts[2]);
         } catch (...) {
-            p.stock = 0;
+            stock = 0;
         }
 
         try {
-            p.soldCount = std::stoi(parts[3]);
+            soldCount = std::stoi(parts[3]);
         } catch (...) {
-            p.soldCount = 0;
-        }
-
-
-        if (!Common::PRODUCT_CATEGORIES.empty()) {
-            p.category = Common::PRODUCT_CATEGORIES.front();
-        } else {
-            p.category = "Unspecified";
+            soldCount = 0;
         }
 
         if (parts.size() > 4) {
             std::string catCandidate = Common::trim(parts[4]);
             if (!catCandidate.empty()) {
-                bool matched = false;
-                for (const auto& allowed : Common::PRODUCT_CATEGORIES) {
-                    if (Common::equalsIgnoreCase(allowed, catCandidate)) {
-                        p.category = allowed;
-                        matched = true;
-                        break;
-                    }
-                }
-                if (!matched) {
-                    p.category = catCandidate;
-                }
+                category = catCandidate;
             }
         }
 
-    
-        bool recognized = Common::PRODUCT_CATEGORIES.empty() ? true :
-            std::any_of(Common::PRODUCT_CATEGORIES.begin(),
-                        Common::PRODUCT_CATEGORIES.end(),
-                        [&](const std::string& allowed) {
-                            return Common::equalsIgnoreCase(allowed, p.category);
-                        });
-
-        if (!recognized && !Common::PRODUCT_CATEGORIES.empty()) {
-            p.category = Common::PRODUCT_CATEGORIES.front();
-        }
-
-        products.push_back(p);
+        Product p(name,category,price,stock);
+        p.addSold(soldCount);
+        productCatalog.insert(p);
     }
 
     fin.close();
+
+    productTrie.build(productCatalog.toVector());
 }
 
 void WRFileService::saveProductsToFile() {
     std::ofstream fout(Common::PRODUCTS_FILE, std::ios::trunc);
-    for (size_t i = 0; i < products.size(); ++i) {
-        const auto& p = products[i];
+    auto list = productCatalog.toVector();
+    for (size_t i = 0; i < list.size(); ++i) {
+        const auto& p = list[i];
 
-        fout << p.name << "|"
-             << std::fixed << std::setprecision(2) << p.price << "|"
-             << p.stock << "|"
-             << p.soldCount << "|"
-             << p.category;
+        fout << p.getname() << "|"
+             << std::fixed << std::setprecision(2) << p.getprice() << "|"
+             << p.getstock() << "|"
+             << p.getsoldCount() << "|"
+             << p.getcategory();
 
-        if (i + 1 < products.size()) fout << "\n";
+        if (i + 1 < list.size()) fout << "\n";
     }
     fout.close();
 }
@@ -211,24 +222,25 @@ void WRFileService::loadOrdersFromFile() {
         std::vector<std::string> parts = Common::split(line, '|');
         if (parts.size() < 7) continue;
 
-        Order order;
-        order.id = parts[0];
+        Order order(parts[0] , parts[1] ,  decodeOrderItems(parts[2]) , parts[4].empty() ? 'A' : parts[4][0] , parts[5] , parts[6] );
+       /* order.id = parts[0];
         order.username = parts[1];
-        order.items = Common::decodeOrderItems(parts[2]);
-
+        order.items = decodeOrderItems(parts[2]);*/
+        double totalCost = 0.0;
         try {
-            order.totalCost = std::stod(parts[3]);
+            totalCost = std::stod(parts[3]);
         } catch (...) {
-            order.totalCost = 0.0;
+            totalCost = 0.0;
         }
 
-        order.destinationCity = parts[4].empty() ? 'A' : parts[4][0];
+        /*order.destinationCity = parts[4].empty() ? 'A' : parts[4][0];
         order.address = parts[5];
-        order.status = parts[6];
-
+        order.status = parts[6];*/
+        
+        order.settotalCost(totalCost);
         orders.push_back(order);
-
-        int seq = extractNumericSuffix(order.id);
+        
+        int seq = extractNumericSuffix(order.getid());
         if (seq > maxSeq) maxSeq = seq;
     }
 
@@ -241,13 +253,13 @@ void WRFileService::saveOrdersToFile() {
     for (size_t i = 0; i < orders.size(); ++i) {
         const auto& o = orders[i];
 
-        fout << o.id << "|"
-             << o.username << "|"
-             << Common::encodeOrderItems(o.items) << "|"
-             << std::fixed << std::setprecision(2) << o.totalCost << "|"
-             << o.destinationCity << "|"
-             << o.address << "|"
-             << o.status;
+        fout << o.getid() << "|"
+             << o.getusername() << "|"
+             << encodeOrderItems(o.getitems()) << "|"
+             << std::fixed << std::setprecision(2) << o.gettotalCost() << "|"
+             << o.getdestinationCity() << "|"
+             << o.getaddress() << "|"
+             << o.getstatus();
 
         if (i + 1 < orders.size()) fout << "\n";
     }
@@ -269,41 +281,48 @@ void WRFileService::loadPackagesFromFile() {
         std::vector<std::string> parts = Common::split(line, '|');
         if (parts.size() < 11) continue;
 
-        Package pack;
-        pack.id = parts[0];
+        Package pack(parts[0] , parts[1] , parts[2] , decodeOrderItems(parts[3]) , parts[4].empty() ? 'A' : parts[4][0] , parts[5] , parts[7] , parts[8]);
+        /*pack.id = parts[0];
         pack.orderId = parts[1];
         pack.username = parts[2];
-        pack.items = Common::decodeOrderItems(parts[3]);
+        pack.items = decodeOrderItems(parts[3]);
         pack.destinationCity = parts[4].empty() ? 'A' : parts[4][0];
         pack.address = parts[5];
+*/
+    int score;
+    int routeDistance;
+    long long enqueueIndex;
 
         try {
-            pack.score = std::stoi(parts[6]);
+            score = std::stoi(parts[6]);
         } catch (...) {
-            pack.score = 0;
+            score = 0;
         }
 
-        pack.status = parts[7];
-        pack.routeDisplay = parts[8];
+        /*pack.status = parts[7];
+        pack.routeDisplay = parts[8];*/
 
         try {
-            pack.routeDistance = std::stoi(parts[9]);
+            routeDistance = std::stoi(parts[9]);
         } catch (...) {
-            pack.routeDistance = 0;
+            routeDistance = 0;
         }
 
         try {
-            pack.enqueueIndex = std::stoll(parts[10]);
+            enqueueIndex = std::stoll(parts[10]);
         } catch (...) {
-            pack.enqueueIndex = 0;
+            enqueueIndex = 0;
         }
 
+        pack.setscore(score);
+        pack.setrouteDistance(routeDistance);
+        pack.setenqueueIndex(enqueueIndex);
         packages.push_back(pack);
 
-        int seq = extractNumericSuffix(pack.id);
+        int seq = extractNumericSuffix(pack.getid());
         if (seq > maxSeq) maxSeq = seq;
-        if (pack.enqueueIndex > globalPackageSequence) {
-            globalPackageSequence = pack.enqueueIndex;
+        if (pack.getenqueueIndex() > globalPackageSequence) {
+            globalPackageSequence = pack.getenqueueIndex();
         }
     }
 
@@ -316,17 +335,17 @@ void WRFileService::savePackagesToFile() {
     for (size_t i = 0; i < packages.size(); ++i) {
         const auto& p = packages[i];
 
-        fout << p.id << "|"
-             << p.orderId << "|"
-             << p.username << "|"
-             << Common::encodeOrderItems(p.items) << "|"
-             << p.destinationCity << "|"
-             << p.address << "|"
-             << p.score << "|"
-             << p.status << "|"
-             << p.routeDisplay << "|"
-             << p.routeDistance << "|"
-             << p.enqueueIndex;
+        fout << p.getid() << "|"
+             << p.getorderId() << "|"
+             << p.getusername() << "|"
+             << encodeOrderItems(p.getitems()) << "|"
+             << p.getdestinationCity() << "|"
+             << p.getaddress() << "|"
+             << p.getscore() << "|"
+             << p.getstatus() << "|"
+             << p.getrouteDisplay() << "|"
+             << p.getrouteDistance() << "|"
+             << p.getenqueueIndex();
 
         if (i + 1 < packages.size()) fout << "\n";
     }
