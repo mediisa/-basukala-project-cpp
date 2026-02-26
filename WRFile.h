@@ -25,6 +25,8 @@ public:
 private:
     void ensureDefaultAdmin();
     static int extractNumericSuffix(const std::string& id);
+    std::string encodeOrderItems(const std::vector<OrderItem>& items);
+    std::vector<OrderItem> decodeOrderItems(const std::string& encoded);
 };
 
 extern WRFileService wrFileService;
