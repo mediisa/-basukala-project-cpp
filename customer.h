@@ -20,7 +20,7 @@ class CustomerService {
     private:
         UserService& userService_;
 
-    std::string promptLine(const std::string& prompt);
+
     bool askYesNo(const std::string& prompt);
     bool tryParseInt(const std::string& s, int& out);
     int totalQuantityInCartFor(const std::vector<OrderItem>& cart, const std::string& productName);
@@ -38,12 +38,11 @@ class CustomerService {
     void searchProductsWithSuggestions(std::vector<OrderItem>& cart);
 
     void addSelectedProductToCart(std::vector<OrderItem>& cart, Product* product);
-    std::vector<Product*> displayProductsByCategorySorted(const std::string& categoryFilter);
+    std::vector<Product> displayProductsByCategorySorted(const std::string& categoryFilter , bool& sortByPrice);
     Product* selectProductByName();
     Product* selectProductFromSuggestions(std::vector<std::string>& suggestions);
     Product* selectProductByCategoryByNumber1();
 
-   // void ModifyCart(std::vector<OrderItem>& cart );
     void removeFromCart(std::vector<OrderItem>& cart, std::vector<RemovedItem>& removedStack);
     void undoLastRemoval(std::vector<OrderItem>& cart, std::vector<RemovedItem>& removedStack);
     void restoreRemovedByNumber(std::vector<OrderItem>& cart, std::vector<RemovedItem>& removedStack);
