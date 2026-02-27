@@ -61,7 +61,40 @@ void AdminService::printCategoryOptions() {
     }
 }
 
-void AdminService::displayProductsByCategorySorted(const std::string& categoryFilter) {
+void AdminService::selectProductByCategoryByNumber() {
+    if (productCatalog.toVector().empty()) {
+        std::cout << "No products available.\n";
+        return ;
+    }
+
+    printCategoryOptions();
+    std::string categoryInput = Common::promptLine("Filter by category (number or name, Enter for all): ");
+    std::string resolvedCategory;
+    bool sortByPrice = false;
+
+    if (!categoryInput.empty() && !Common::resolveCategoryInput(categoryInput, resolvedCategory)) {
+        std::cout << "Invalid category selection. Showing all categories.\n";
+        resolvedCategory.clear();
+        sortByPrice = true;
+    }
+
+    displayProductsByCategorySorted(resolvedCategory , sortByPrice);
+
+
+        std::string cmd = Common::promptLine("For price sort enter -2, Back enter -1: ");
+        if(cmd == "-1"){
+            return;
+        }else if( cmd == "-2"){
+            sortByPrice = true;
+            displayProductsByCategorySorted(resolvedCategory , sortByPrice);     
+        } else {
+            std::cout << "Invalid command.\n";
+            return;
+        }
+    
+}
+
+void AdminService::displayProductsByCategorySorted(const std::string& categoryFilter , bool& sortByPrice) {
     std::vector<Product> list;
 
     if (!categoryFilter.empty()){
@@ -71,10 +104,15 @@ void AdminService::displayProductsByCategorySorted(const std::string& categoryFi
     }
         
 
-
-    std::sort(list.begin(), list.end(), [](const Product& a, const Product& b) {
-        return Common::toUpperCopy(a.getname()) < Common::toUpperCopy(b.getname());
-    });
+    if(sortByPrice){
+        std::sort(list.begin(), list.end(), [](const Product& a, const Product& b) {
+        return a.getprice() > b.getprice();
+        });        
+    }else{
+        std::sort(list.begin(), list.end(), [](const Product& a, const Product& b) {
+            return Common::toUpperCopy(a.getname()) < Common::toUpperCopy(b.getname());
+        });
+    }
 
     if (list.empty()) {
         if (!categoryFilter.empty()) std::cout << "No products found in the selected category.\n";
@@ -92,25 +130,6 @@ void AdminService::displayProductsByCategorySorted(const std::string& categoryFi
     }
 
     return ;
-}
-
-void AdminService::selectProductByCategoryByNumber() {
-    if (productCatalog.toVector().empty()) {
-        std::cout << "No products available.\n";
-        return ;
-    }
-
-    printCategoryOptions();
-    std::string categoryInput = Common::promptLine("Filter by category (number or name, Enter for all): ");
-    std::string resolvedCategory;
-
-    if (!categoryInput.empty() && !Common::resolveCategoryInput(categoryInput, resolvedCategory)) {
-        std::cout << "Invalid category selection. Showing all categories.\n";
-        resolvedCategory.clear();
-    }
-
-    displayProductsByCategorySorted(resolvedCategory);
-
 }
 
 void AdminService::displayByTopSellingNamePriceProduct(int choice){
@@ -164,37 +183,9 @@ void AdminService::displayUsers() {
     }
 }
 
-void AdminService::displayPendingPackages() {
-    std::cout << "\n--- Pending Packages ---\n";
-    std::priority_queue<Package*, std::vector<Package*>, PackageComparator> pq;
-    for (auto& pack : packages) {
-        if (pack.status == "Pending") pq.push(&pack);
-    }
-
-    if (pq.empty()) {
-        std::cout << "No pending packages.\n";
-        return;
-    }
-
-    int counter = 1;
-    while (!pq.empty()) {
-        Package* pack = pq.top();
-        pq.pop();
-        std::cout << counter++ << ". Package ID: " << pack->id
-                  << " | Order ID: " << pack->orderId
-                  << " | User: " << pack->username
-                  << " | Destination: " << pack->destinationCity
-                  << " (" << CITY_LABELS.at(pack->destinationCity) << ")"
-                  << " | Score: " << pack->score
-                  << " | Queue Position Index: " << pack->enqueueIndex << "\n";
-    }
-}
-
 void AdminService::addProduct() {
     std::cout << "\n--- Add Product ---\n";
     std::string countInput = Common::promptLine("How many items do you want to add ? \n");
-    //std::cout << ;
-    //std::getline(std::cin, countInput);
 
     int cho = 0;
     try {
@@ -210,36 +201,36 @@ void AdminService::addProduct() {
     }
 
     while (cho > 0) {
-        std::string name = Common::promptLine("Product name: ");
+        std::string name;
+while(true){
+        name = Common::promptLine("Product name: ");
 
         if (name.empty()) {
             std::cout << "Name cannot be empty.\n";
-            return;
+            continue;
         }
 
         if (Common::findProduct(name)) {
             std::cout << "Product already exists.\n";
             while(true){
                 std::string input = Common::promptLine("Do you want edit ?(Y/N) \n");
-                if(Common::toUpperCopy(input) == "Y" ){ editProduct(); break;}
-                else if(Common::toUpperCopy(input) == "N"){ return;}
+                if(Common::toUpperCopy(input) == "Y" ){ editProduct(name); cho--; break;}
+                else if(Common::toUpperCopy(input) == "N"){break;}
                 std::cout << "Please enter the Y/y or N/n.  ";
             }
+            continue;
         }
-
+        break;
+    }
         std::string priceInput = Common::promptLine("Price (USD): ");
         std::string  stockInput = Common::promptLine("Stock quantity: ");
-        //std::cout << "Price (USD): ";
-        //std::getline(std::cin, priceInput);
-        //std::cout << "Stock quantity: ";
-        //std::getline(std::cin, stockInput);
 
         try {
             double price = std::stod(priceInput);
             int stock = std::stoi(stockInput);
             if (price < 0 || stock < 0) {
                 std::cout << "Price and stock must be non-negative.\n";
-                return;
+                break;
             }
 
             std::string categorySelection;
@@ -261,19 +252,17 @@ void AdminService::addProduct() {
             wrFileService.saveProductsToFile();
 
             std::cout << "Product added successfully.\n";
+
         } catch (...) {
             std::cout << "Invalid numeric input.\n";
         }
-
-        cho--;
+    cho--;
     }
 }
 
 void AdminService::deleteProduct() {
     std::cout << "\n--- Delete Product ---\n";
     std::string name = Common::promptLine("Product name to delete: ");
-    //std::cout << ;
-    //std::getline(std::cin, name);
 
     Product* prod = Common::findProduct(name);
     if(!prod){
@@ -287,19 +276,20 @@ void AdminService::deleteProduct() {
     productTrie.build(productCatalog.toVector());
     wrFileService.saveProductsToFile();
     std::cout << "Product removed.\n";
-
+    return;
 }
 
-void AdminService::editProduct() {
+void AdminService::editProduct(std::string& name) {
     std::cout << "\n--- Edit Product ---\n";
-    std::string name;
-    std::cout << "Product name to edit: ";
-    std::getline(std::cin, name);
 
     Product* prod = Common::findProduct(name);
     if(!prod){
         std::cout << "Product not found.\n"; return;
     }
+    std::cout << "name: "<<prod->getname()
+              << "| Price: $"<<prod->getprice()
+              << "| Stock quantity: "<<prod->getstock()
+              << "| Category: "<<prod->getcategory();
 
     std::cout << "\n--- Modify Product ---\n"
               << "1) Edit price\n"
@@ -391,10 +381,36 @@ void AdminService::editProduct() {
     return;
 }
 
+void AdminService::displayPendingPackages() {
+    std::cout << "\n--- Pending Packages ---\n";
+    std::priority_queue<Package*, std::vector<Package*>, PackageComparator> pq;
+    for (auto& pack : packages) {
+        if (pack.getstatus() == "Pending") pq.push(&pack);
+    }
+
+    if (pq.empty()) {
+        std::cout << "No pending packages.\n";
+        return;
+    }
+
+    int counter = 1;
+    while (!pq.empty()) {
+        Package* pack = pq.top();
+        pq.pop();
+        std::cout << counter++ << ". Package ID: " << pack->getid()
+                  << " | Order ID: " << pack->getorderId()
+                  << " | User: " << pack->getusername()
+                  << " | Destination: " << pack->getdestinationCity()
+                  << " (" << CITY_LABELS.at(pack->getdestinationCity()) << ")"
+                  << " | Score: " << pack->getscore()
+                  << " | Queue Position Index: " << pack->getenqueueIndex() << "\n";
+    }
+}
+
 void AdminService::processNextPackage() {
     std::priority_queue<Package*, std::vector<Package*>, PackageComparator> pq;
     for (auto& pack : packages) {
-        if (pack.status == "Pending") pq.push(&pack);
+        if (pack.getstatus() == "Pending") pq.push(&pack);
     }
 
     if (pq.empty()) {
@@ -406,16 +422,16 @@ void AdminService::processNextPackage() {
     pq.pop();
 
     std::cout << "\n--- Processing Package ---\n"
-              << "Package ID: " << pack->id << "\n"
-              << "Order ID: " << pack->orderId << "\n"
-              << "Customer: " << pack->username << "\n"
-              << "Destination: " << pack->destinationCity
-              << " (" << CITY_LABELS.at(pack->destinationCity) << ")\n"
-              << "Address: " << pack->address << "\n"
-              << "Package Score (total items): " << pack->score << "\n"
+              << "Package ID: " << pack->getid() << "\n"
+              << "Order ID: " << pack->getorderId() << "\n"
+              << "Customer: " << pack->getusername() << "\n"
+              << "Destination: " << pack->getdestinationCity()
+              << " (" << CITY_LABELS.at(pack->getdestinationCity()) << ")\n"
+              << "Address: " << pack->getaddress() << "\n"
+              << "Package Score (total items): " << pack->getscore() << "\n"
               << "Products:\n";
 
-    for (const auto& item : pack->items) {
+    for (const auto& item : pack->getitems()) {
         Product* prod = Common::findProduct(item.productName);
         std::cout << "  - " << item.productName;
         if (prod && !prod->getcategory().empty()) {
@@ -424,26 +440,26 @@ void AdminService::processNextPackage() {
        // std::cout << item.quantity << "\n";
     }
 
-    PathResult route = shortestRouteFromNearestWarehouse(pack->destinationCity);
+    PathResult route = shortestRouteFromNearestWarehouse(pack->getdestinationCity());
     if (!route.reachable) {
         std::cout << "No route available from warehouses to destination.\n";
         return;
     }
 
-    pack->routeDisplay = formatRouteDisplay(route.path, route.distance);
-    pack->routeDistance = route.distance;
-    pack->status = "Delivered";
+    pack->setrouteDisplay(formatRouteDisplay(route.path, route.distance));
+    pack->setrouteDistance(route.distance);
+    pack->setstatus("Delivered");
 
-    std::cout << "Computed Route: " << pack->routeDisplay << "\n";
+    std::cout << "Computed Route: " << pack->getrouteDisplay() << "\n";
 
-    Order* order = Common::findOrder(pack->orderId);
+    Order* order = Common::findOrder(pack->getorderId());
     if (order) order->setStatus("Delivered");
 
-    User* user = Common::findUser(pack->username);
+    User* user = Common::findUser(pack->getusername());
     if (user) {
         //user->score += pack->score;
-        user->addScore(pack->score);
-        userService_.refreshUserHistoryStatus(*user);
+        user->addScore(pack->getscore());
+       // userService_.refreshUserHistoryStatus(*user);
     }
 
     wrFileService.saveUsersToFile();
@@ -454,7 +470,7 @@ void AdminService::processNextPackage() {
 }
 
 void AdminService::adminMenu(User& adminUser) {
-    (void)adminUser; // فعلاً استفاده نمی‌شود ولی برای سازگاری نگه داشته شده
+    (void)adminUser; 
     while (true) {
         std::cout << "\n=== Admin Menu ===\n"
                   << "1. View Products\n"
@@ -479,7 +495,8 @@ void AdminService::adminMenu(User& adminUser) {
             deleteProduct();
         } else if(choice == "4"){
             displayProducts();
-            editProduct();
+            std::string name = Common::promptLine("Product name to edit: ");
+            editProduct(name);
         }else if (choice == "5") {
             displayUsers();
         } else if (choice == "6") {
