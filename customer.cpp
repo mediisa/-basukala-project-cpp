@@ -11,6 +11,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <queue>
 #include <map>
 
 
@@ -18,16 +19,10 @@
 CustomerService::CustomerService(UserService& userService)
     : userService_(userService) {}
 
-std::string CustomerService::promptLine(const std::string& prompt) {
-    std::cout << prompt;
-    std::string input;
-    std::getline(std::cin, input);
-    return input;
-}
 
 bool CustomerService::askYesNo(const std::string& prompt) {
     while (true) {
-        std::string in = promptLine(prompt);
+        std::string in = Common::promptLine(prompt);
         if (in.empty()) continue;
         char c = std::toupper(static_cast<unsigned char>(in[0]));
         if (c == 'Y') return true;
@@ -96,6 +91,11 @@ void CustomerService::customerMenu(User& user) {
 
         if(choice == "1"){
             displayProducts();
+               if (askYesNo("Do you want to select a product from suggestions? (Y/N): ")) {
+                    std::string name = Common::promptLine("Enter Product Name: ");
+                    Product* p = Common::findProduct(name);
+                    addSelectedProductToCart(cart, p);
+                }
         }else if(choice == "2"){
             store(cart , user );
         }else if(choice == "3"){
@@ -120,7 +120,7 @@ void CustomerService::customerMenu(User& user) {
                 std::cout << "Invalid option.\n";
             }
         }else if(choice == "4") {
-            userService_.refreshUserHistoryStatus(user);
+            //userService_.refreshUserHistoryStatus(user);
             displayOrderHistoryFromOrders(user);
         }else if(choice == "5"){
             addFunds(user);
@@ -182,13 +182,7 @@ void CustomerService::store(std::vector<OrderItem>& cart , User& user ){
         }else if(m == "2"){
             displayCart(cart);
         }else if(m == "3"){
-            searchProductsWithSuggestions(cart);
-            /*if (askYesNo("Do you want to select a product from suggestions? (Y/N): ")) {
-                Product* p = selectProductFromSuggestions();
-                if (p && askYesNo("Add selected product to cart? (Y/N): ")) {
-                    addSelectedProductToCart(cart, p);
-                }
-            }   */        
+            searchProductsWithSuggestions(cart);       
         }else if(m == "4"){
             checkout(user, cart);
         }else if(m == "5"){
@@ -201,7 +195,7 @@ void CustomerService::store(std::vector<OrderItem>& cart , User& user ){
 
 void CustomerService::addToCart(std::vector<OrderItem>& cart) {
     std::cout << "\n--- Add to Cart ---\n";
-    std::string countInput = promptLine("How many different products do you want to add? ");
+    std::string countInput = Common::promptLine("How many different products do you want to add? ");
     int count = 0;
     if (!tryParseInt(countInput, count) || count <= 0) {
         std::cout << "Invalid number.\n";
@@ -223,10 +217,6 @@ void CustomerService::addToCart(std::vector<OrderItem>& cart) {
             addSelectedProductToCart(cart, p);
         } else if (m == "2") {
             searchProductsWithSuggestions(cart);
-            /*if (askYesNo("Do you want to select a product from suggestions? (Y/N): ")) {
-                Product* p = selectProductFromSuggestions();
-                addSelectedProductToCart(cart, p);
-            }*/
         } else if (m == "3") {
             Product* p = selectProductByName();
             addSelectedProductToCart(cart, p);
@@ -238,16 +228,24 @@ void CustomerService::addToCart(std::vector<OrderItem>& cart) {
     }
 }
 
-std::vector<Product*> CustomerService::displayProductsByCategorySorted(const std::string& categoryFilter) {
-    std::vector<Product*> list;
-    for (auto& p : products) {
-        if (!categoryFilter.empty() && !Common::equalsIgnoreCase(p.category, categoryFilter)) continue;
-        list.push_back(&p);
+std::vector<Product> CustomerService::displayProductsByCategorySorted(const std::string& categoryFilter , bool& sortByPrice) {
+    std::vector<Product> list;
+
+    if (!categoryFilter.empty()){
+        list = productCatalog.getCategoryProducts(categoryFilter);
+    }else{
+        list = productCatalog.toVector();
     }
 
-    std::sort(list.begin(), list.end(), [](const Product* a, const Product* b) {
-        return Common::toUpperCopy(a->name) < Common::toUpperCopy(b->name);
-    });
+    if(sortByPrice){
+        std::sort(list.begin(), list.end(), [](const Product& a, const Product& b) {
+        return a.getprice() > b.getprice();
+        });        
+    }else{
+        std::sort(list.begin(), list.end(), [](const Product& a, const Product& b) {
+            return Common::toUpperCopy(a.getname()) < Common::toUpperCopy(b.getname());
+        });
+    }
 
     if (list.empty()) {
         if (!categoryFilter.empty()) std::cout << "No products found in the selected category.\n";
@@ -256,94 +254,119 @@ std::vector<Product*> CustomerService::displayProductsByCategorySorted(const std
     }
 
     for (size_t i = 0; i < list.size(); ++i) {
-        const auto* product = list[i];
-        std::cout << i  << ". " << product->name
-                  << " | Category: " << (product->category.empty() ? "-" : product->category)
-                  << " | Price: $" << std::fixed << std::setprecision(2) << product->price <<" \n";
+        const auto& product = list[i];
+        std::cout << i  << ". " << product.getname()
+                  << " | Category: " << (product.getcategory().empty() ? "-" : product.getcategory())
+                  << " | Price: $" << std::fixed << std::setprecision(2) << product.getprice() <<" \n";
     }
 
     return list;
 }
 
 void CustomerService::selectProductByCategoryByNumber() {
-    if (products.empty()) {
+    if (productCatalog.toVector().empty()) {
         std::cout << "No products available.\n";
         return ;
     }
 
     printCategoryOptions();
-    std::string categoryInput = promptLine("Filter by category (number or name, Enter for all): ");
+    std::string categoryInput = Common::promptLine("Filter by category (number or name, Enter for all): ");
     std::string resolvedCategory;
+    bool sortByPrice = false;
 
     if (!categoryInput.empty() && !Common::resolveCategoryInput(categoryInput, resolvedCategory)) {
         std::cout << "Invalid category selection. Showing all categories.\n";
         resolvedCategory.clear();
+        sortByPrice = true;
     }
 
-    displayProductsByCategorySorted(resolvedCategory);
+    displayProductsByCategorySorted(resolvedCategory , sortByPrice);
+    
 
+        std::string cmd = Common::promptLine("For price sort enter -2, Back enter -1: ");
+        if(cmd == "-1"){
+            return;
+        }else if( cmd == "-2"){
+            sortByPrice = true;
+            displayProductsByCategorySorted(resolvedCategory , sortByPrice);     
+        }else {
+            std::cout << "Invalid command.\n";
+            return; 
+        }
 }
 
 void CustomerService::displayByTopSellingNamePriceProduct(int choice){
-    if (products.empty()) {
+    auto sorted = productCatalog.toVector();
+    if (sorted.empty()) {
         std::cout << "No products available.\n";
         return;
     }
 
     std::cout << "\n ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ \n";
 
-    auto sorted = products;
     std::sort(sorted.begin() , sorted.end() , 
             [&choice](const Product& a , const Product& b){
                 if(choice == 1){
-                    return a.soldCount > b.soldCount;
+                    return a.getsoldCount() > b.getsoldCount();
                 }else if(choice == 2){
-                    return a.name < b.name;
+                    return a.getname() < b.getname();
                 }else if(choice == 3){
-                    return a.price > b.price;
+                    return a.getprice() > b.getprice();
                 }else{
                     return false;
                 }
             });
 
 
-    for (size_t i=0 ; i < products.size() ; ++i){
+    for (size_t i=0 ; i < sorted.size() ; ++i){
         const auto& p = sorted[i];
-        std::cout << i+1 << ". "<<p.name
-                  << " | Price: $"<< std::fixed << std::setprecision(2) << p.price
-                  << " | Category: "<<p.category <<" \n";
+        std::cout << i+1 << ". "<<p.getname()
+                  << " | Price: $"<< std::fixed << std::setprecision(2) << p.getprice()
+                  << " | Category: "<<p.getcategory() <<" \n";
     }
 }
 
 void CustomerService::displayTopSellingProduct(int topN){
-    if (products.empty()) {
+    auto sorted = productCatalog.toVector();
+    if (sorted.empty()) {
         std::cout << "No products available.\n";
         return;
     }
 
     std::cout << "\n \n ~ ~ ~ ~ ~ Top Selling Products ~ ~ ~ ~ ~ \n";
 
-    auto sorted = products;
-    std::sort(sorted.begin() , sorted.end() , 
+    /*std::sort(sorted.begin() , sorted.end() , 
             [](const Product& a , const Product& b){
-                return a.soldCount > b.soldCount;
-            });
+                return a.getsoldCount() > b.getsoldCount();
+            });*/
+
+    auto cmp = [](const Product& a, const Product& b){
+        return a.getsoldCount() < b.getsoldCount(); 
+    };
+
+    std::priority_queue<Product, std::vector<Product>, decltype(cmp)> pq(cmp);
+
+    for(const auto& p : sorted ){
+        pq.push(p);
+    }
 
     int lim = std::min(topN , static_cast<int>(sorted.size()));
     for (int i=0 ; i<lim ; ++i){
-        const auto& p = sorted[i];
-        std::cout << i+1 << ". "<<p.name
-                  << " | Price: $"<< std::fixed << std::setprecision(2) << p.price
-                  << " | Category: "<<p.category <<"\n";
+        const auto& p = pq.top();
+        std::cout << i+1 << ". "<<p.getname()
+                  << " | Price: $"<< std::fixed << std::setprecision(2) << p.getprice()
+                  << " | Category: "<<p.getcategory() <<"\n";
+        
+        pq.pop();
     }
 }
 
 void CustomerService::displayUserInfo(User& user){
     std::cout << "\n ---- User ---- \n"
-              << "Username: "<<user.username
-              << " | Password: "<<user.password
-              << " | Balance: $"<<user.balance
-              << " | Score: "<<user.score<<"\n";
+              << "Username: "<<user.getusername()
+              << " | Password: "<<user.getpassword()
+              << " | Balance: $"<<user.getbalance()
+              << " | Score: "<<user.getscore()<<"\n";
 }
 
 void CustomerService::displayCart(const std::vector<OrderItem>& cart) {
@@ -358,7 +381,7 @@ void CustomerService::displayCart(const std::vector<OrderItem>& cart) {
     for (size_t i = 0; i < cart.size(); ++i) {
         const auto& item = cart[i];
         Product* product = Common::findProduct(item.productName);
-        std::string category = product ? product->category : "-";
+        std::string category = product ? product->getcategory() : "-";
         double lineTotal = item.quantity * item.unitPrice;
         subtotal += lineTotal;
         int a=item.quantity;
@@ -384,7 +407,7 @@ void CustomerService::displayCart(const std::vector<OrderItem>& cart) {
 
 void CustomerService::searchProductsWithSuggestions(std::vector<OrderItem>& cart) {
     std::cout << "\n--- Product Search ---\n";
-    std::string query = promptLine("Enter product name or prefix: ");
+    std::string query = Common::promptLine("Enter product name or prefix: ");
 
     std::vector<std::string> suggestions = productTrie.suggest(query, 10);
     if (suggestions.empty()) {
@@ -396,12 +419,12 @@ void CustomerService::searchProductsWithSuggestions(std::vector<OrderItem>& cart
     for (size_t i = 0; i < suggestions.size(); ++i) {
         std::cout << i  << ". " << suggestions[i];
         Product* product = Common::findProduct(suggestions[i]);
-        if (product && !product->category.empty()) {
-            std::cout << " | Category: " << product->category;
+        if (product && !product->getcategory().empty()) {
+            std::cout << " | Category: " << product->getcategory();
         }
         std::cout << "\n";
     }
-   // selectProductFromSuggestions(suggestions);
+
    if (askYesNo("Do you want to select a product from suggestions? (Y/N): ")) {
         Product* p = selectProductFromSuggestions(suggestions);
         addSelectedProductToCart(cart, p);
@@ -409,47 +432,43 @@ void CustomerService::searchProductsWithSuggestions(std::vector<OrderItem>& cart
 }
 
 Product* CustomerService::selectProductFromSuggestions(std::vector<std::string>& suggestions) {
-    std::string in = promptLine("Enter suggestion number to select (-1 to go back): ");
+    std::string in = Common::promptLine("Enter suggestion number to select (-1 to go back): ");
     int idx = 0;
     if (!tryParseInt(in, idx)) { std::cout << "Invalid number.\n"; return nullptr; }
     if (idx == -1) return nullptr;
-/*    std::cout << "Re-enter the search query to confirm selection: ";
-    std::string query;
-    std::getline(std::cin, query);
-*/
-  //  auto suggestions = productTrie.suggest(query, 10);
+
     if (idx < 0 || idx >= static_cast<int>(suggestions.size())) {
         std::cout << "Out of range.\n";
         return nullptr;
     }
   
     Product* p = Common::findProduct(suggestions[idx]);
-    if (!p) {std::cout << "Selected product no longer exists.\n";}
-    else{std::cout << "Yesssssssss\n";}
+    if (!p) std::cout << "Selected product no longer exists.\n";
+ 
     return p;
 }
 
 Product* CustomerService::selectProductByName() {
-    std::string name = promptLine("Enter product name: ");
+    std::string name = Common::promptLine("Enter product name: ");
     Product* product = Common::findProduct(name);
     if (!product) {
         std::cout << "Product not found.\n";
         return nullptr;
     }
-    std::cout << "Selected: " << product->name
-              << " | Category: " << (product->category.empty() ? "-" : product->category)
-              << " | Price: $" << std::fixed << std::setprecision(2) << product->price << "\n";
+    std::cout << "Selected: " << product->getname()
+              << " | Category: " << (product->getcategory().empty() ? "-" : product->getcategory())
+              << " | Price: $" << std::fixed << std::setprecision(2) << product->getprice() << "\n";
     return product;
 }
 
 Product* CustomerService::selectProductByCategoryByNumber1() {
-    if (products.empty()) {
+    if (productCatalog.toVector().empty()) {
         std::cout << "No products available.\n";
         return nullptr;
     }
 
     printCategoryOptions();
-    std::string categoryInput = promptLine("Filter by category (number or name, Enter for all): ");
+    std::string categoryInput = Common::promptLine("Filter by category (number or name, Enter for all): ");
     std::string resolvedCategory;
 
     if (!categoryInput.empty() && !Common::resolveCategoryInput(categoryInput, resolvedCategory)) {
@@ -457,10 +476,11 @@ Product* CustomerService::selectProductByCategoryByNumber1() {
         resolvedCategory.clear();
     }
 
-    auto filtered = displayProductsByCategorySorted(resolvedCategory);
+    bool sortByPrice = false;
+    auto filtered = displayProductsByCategorySorted(resolvedCategory , sortByPrice);
     if (filtered.empty()) return nullptr;
 
-    std::string in = promptLine("Enter product number to select (-1 to go back): ");
+    std::string in = Common::promptLine("Enter product number to select (-1 to go back): ");
     int idx = 0;
     if (!tryParseInt(in, idx)) { std::cout << "Invalid number.\n"; return nullptr; }
     if (idx == -1) return nullptr;
@@ -469,35 +489,35 @@ Product* CustomerService::selectProductByCategoryByNumber1() {
         return nullptr;
     }
 
-    Product* p = filtered[idx];
-    std::cout << "Selected: " << p->name
-              << " | Category: " << (p->category.empty() ? "-" : p->category)
-              << " | Price: $" << std::fixed << std::setprecision(2) << p->price << "\n";
+    Product* p = Common::findProduct(filtered[idx].getname());
+    std::cout << "Selected: " << p->getname()
+              << " | Category: " << (p->getcategory().empty() ? "-" : p->getcategory())
+              << " | Price: $" << std::fixed << std::setprecision(2) << p->getprice() << "\n";
     return p;
 }
 
 void CustomerService::addSelectedProductToCart(std::vector<OrderItem>& cart, Product* product) {
     if (!product) return;
-    if (product->stock <= 0) {
+    if (product->getstock() <= 0) {
         std::cout << "Product out of stock.\n";
         return;
     }
 
-    std::string qtyInput = promptLine("Quantity: ");
+    std::string qtyInput = Common::promptLine("Quantity: ");
     int qty = 0;
     if (!tryParseInt(qtyInput, qty) || qty <= 0) {
         std::cout << "Invalid quantity.\n";
         return;
     }
 
-    int existing = totalQuantityInCartFor(cart, product->name);
-    if (existing + qty > product->stock) {
-        std::cout << "Insufficient stock. Available: " << product->stock
+    int existing = totalQuantityInCartFor(cart, product->getname());
+    if (existing + qty > product->getstock()) {
+        std::cout << "Insufficient stock. Available: " << product->getstock()
                   << " | In cart: " << existing << " | Requested: " << qty << "\n";
         return;
     }
 
-    OrderItem newItem(product->name, qty, product->price);
+    OrderItem newItem(product->getname(), qty, product->getprice());
     cart.push_back(newItem);
 
     std::cout << "Added to cart as a new row.\n";
@@ -526,9 +546,9 @@ void CustomerService::checkout(User& user, std::vector<OrderItem>& cart) {
             std::cout << "Product " << kv.first << " not found during checkout. Aborting.\n";
             return;
         }
-        if (p->stock < kv.second) {
+        if (p->getstock() < kv.second) {
             std::cout << "Stock changed for " << kv.first
-                      << ". Needed: " << kv.second << ", Available: " << p->stock
+                      << ". Needed: " << kv.second << ", Available: " << p->getstock()
                       << ". Checkout cancelled.\n";
             return;
         }
@@ -536,8 +556,8 @@ void CustomerService::checkout(User& user, std::vector<OrderItem>& cart) {
 
     double totalCost = subtotal + Common::SHIPPING_COST;
 
-    std::cout << "Your current balance is $" << std::fixed << std::setprecision(2) << user.balance << "\n";
-    if (user.balance < totalCost) {
+    std::cout << "Your current balance is $" << std::fixed << std::setprecision(2) << user.getbalance() << "\n";
+    if (user.getbalance() < totalCost) {
         std::cout << "Insufficient balance. Please add funds.\n";
         return;
     }
@@ -545,7 +565,7 @@ void CustomerService::checkout(User& user, std::vector<OrderItem>& cart) {
     char destination = promptDestinationCity();
     if (destination == '\0') return;
 
-    std::string address = promptLine("Enter delivery address: ");
+    std::string address = Common::promptLine("Enter delivery address: ");
     if (address.empty()) {
         std::cout << "Address cannot be empty.\n";
         return;
@@ -553,41 +573,43 @@ void CustomerService::checkout(User& user, std::vector<OrderItem>& cart) {
 
     for (const auto& kv : req) {
         Product* p = Common::findProduct(kv.first);
-        p->stock -= kv.second;
-        p->soldCount += kv.second;
+        p->reduceStock(kv.second);
+        p->addSold(kv.second);
     }
 
-    user.balance -= totalCost;
-
+    user.reduceBlance(totalCost);
     User* admin = Common::findUser("Admin");
     if (admin) {
-        admin->balance += totalCost;
+        admin->addBlance(totalCost);
     }
     
     std::string orderId = Common::nextOrderId();
-    Order newOrder;
-    newOrder.id = orderId;
-    newOrder.username = user.username;
+    Order newOrder(orderId , user.getusername() , cart , totalCost , destination , address , "Pending" );
+    /*newOrder.id = orderId;
+    newOrder.username = user.getusername();
     newOrder.items = cart;
     newOrder.totalCost = totalCost;
     newOrder.destinationCity = destination;
     newOrder.address = address;
-    newOrder.status = "Pending";
+    newOrder.status = "Pending";*/
     orders.push_back(newOrder);
 
     std::string packageId = Common::nextPackageId();
-    Package pack;
-    pack.id = packageId;
-    pack.orderId = orderId;
-    pack.username = user.username;
-    pack.items = cart;
-    pack.destinationCity = destination;
-    pack.address = address;
-    pack.score = totalItemCount;
-    pack.status = "Pending";
-    pack.routeDisplay = "Pending computation";
-    pack.routeDistance = 0;
-    pack.enqueueIndex = Common::getPackageSequence();
+    Package pack(packageId , orderId , user.getusername() , cart , destination , address , "Pending" , "Pending computation");
+    pack.setscore(totalItemCount);
+    pack.setrouteDistance(0);
+    pack.setenqueueIndex(Common::getPackageSequence());
+    //pack.id = packageId;
+    //pack.orderId = orderId;
+   // pack.username = user.getusername();
+    //pack.items = cart;
+   // pack.destinationCity = destination;
+   // pack.address = address;
+    //pack.score = totalItemCount;
+    //pack.status = "Pending";
+    //pack.routeDisplay = "Pending computation";
+   // pack.routeDistance = 0;
+   // pack.enqueueIndex = Common::getPackageSequence();
     packages.push_back(pack);
 
     std::stringstream histEntry;
@@ -596,7 +618,7 @@ void CustomerService::checkout(User& user, std::vector<OrderItem>& cart) {
               << " | Total Paid: $" << std::fixed << std::setprecision(2) << totalCost
               << " | Destination: " << destination << " (" << CITY_LABELS.at(destination) << ")"
               << " | Status: Pending";
-    user.orderHistory.push_back(histEntry.str());
+    
 
     wrFileService.saveAll();
 
@@ -606,18 +628,19 @@ void CustomerService::checkout(User& user, std::vector<OrderItem>& cart) {
 
 void CustomerService::addFunds(User& user) {
     std::cout << "\n--- Add Funds ---\n";
-    std::cout << "Current balance: $" << std::fixed << std::setprecision(2) << user.balance << "\n";
+    std::cout << "Current balance: $" << std::fixed << std::setprecision(2) << user.getbalance() << "\n";
 
-    std::string amountInput = promptLine("Enter amount to add: ");
+    std::string amountInput = Common::promptLine("Enter amount to add: ");
     try {
         double amount = std::stod(amountInput);
         if (amount <= 0) {
             std::cout << "Amount must be positive.\n";
             return;
         }
-        user.balance += amount;
+        //user.balance += amount;
+        user.addBlance(amount);
         wrFileService.saveUsersToFile();
-        std::cout << "Balance updated. New balance: $" << std::fixed << std::setprecision(2) << user.balance << "\n";
+        std::cout << "Balance updated. New balance: $" << std::fixed << std::setprecision(2) << user.getbalance() << "\n";
     } catch (...) {
         std::cout << "Invalid amount.\n";
     }
@@ -629,25 +652,25 @@ void CustomerService::displayOrderHistoryFromOrders(const User& user) {
     bool found = false;
 
     for (const auto& order : orders) {
-        if (order.username != user.username)
+        if (order.getusername() != user.getusername())
             continue;
 
         found = true;
 
         int totalItems = 0 , index = 1;
-        for (const auto& it : order.items)
+        for (const auto& it : order.getitems())
             totalItems += it.quantity;
 
-        std::cout << "#######\nOrder Id: [" << order.id << "] \n"
+        std::cout << "#######\nOrder Id: [" << order.getid() << "] \n"
                   << "Total Items: " << totalItems << "\nProductName: \n";
         
-            for (const auto& item : order.items){
-                std::cout << item.productName << "\n";
+            for (const auto& item : order.getitems()){
+                std::cout << "\t" <<item.productName << "\n";
             }
-        std::cout << "| Total Paid: $" << std::fixed << std::setprecision(2) << order.totalCost
-                  << "\n| Destination: " << order.destinationCity
-                  << " (" << CITY_LABELS.at(order.destinationCity) << ")"
-                  << "\n| Status: " << order.status
+        std::cout << "| Total Paid: $" << std::fixed << std::setprecision(2) << order.gettotalCost()
+                  << "\n| Destination: " << order.getdestinationCity()
+                  << " (" << CITY_LABELS.at(order.getdestinationCity()) << ")"
+                  << "\n| Status: " << order.getstatus()
                   << "\n";
     }
 
@@ -656,29 +679,27 @@ void CustomerService::displayOrderHistoryFromOrders(const User& user) {
     }
 }
 
-
 void CustomerService::removeFromCart(std::vector<OrderItem>& cart, std::vector<RemovedItem>& removedStack) {
     std::cout << "\n--- Remove from Cart ---\n";
     displayCart(cart);
     if (cart.empty()) return;
 
-    std::string idxInput = promptLine("Select item number to remove: ");
+    std::string idxInput = Common::promptLine("Select item number to remove: ");
     int index = 0;
     if (!tryParseInt(idxInput, index)) { std::cout << "Invalid number.\n"; return; }
-    if (index < 0 || index >= static_cast<int>(totalItem(cart))) {
+
+    int total = static_cast<int>(totalItem(cart));
+    if (index < 0 || index >= total) {
         std::cout << "Out of range.\n";
         return;
     }
-/*
-    RemovedItem r{cart[index - 1], static_cast<size_t>(index - 1)};
-    removedStack.push_back(r);
-    cart.erase(cart.begin() + index - 1);
 
-    std::cout << "Removed from cart. You can undo it.\n";*/
-int current = 0;
+    int current = 0;
     for (size_t row = 0; row < cart.size(); ++row) {
-        if (current + cart[row].quantity >= index) {
+        int rowQty = cart[row].quantity;
 
+
+        if (index < current + rowQty) {
             RemovedItem r;
             r.item = cart[row];
             r.item.quantity = 1;
@@ -689,13 +710,13 @@ int current = 0;
             if (cart[row].quantity > 1) {
                 cart[row].quantity -= 1;   
             } else {
-                cart.erase(cart.begin() + row);
+                cart.erase(cart.begin() + row );
             }
 
             std::cout << "Removed item " << index << " from cart.\n";
             return;
         }
-        current += cart[row].quantity;
+        current += rowQty;
     }
 
 }
@@ -737,21 +758,21 @@ void CustomerService::restoreRemovedByNumber(std::vector<OrderItem>& cart, std::
         const auto& r = removedStack[i];
         std::cout << i  << ". " << r.item.productName
                   << " | Qty: " << r.item.quantity
-                  << " | Unit Price: $" << std::fixed << std::setprecision(2) << r.item.unitPrice
-                  << " | Original Pos: " << (r.rowIndex + 1) << "\n";
+                  << " | Unit Price: $" << std::fixed << std::setprecision(2) << r.item.unitPrice << "\n";
+                
     }
 
-    std::string in = promptLine("Enter removed item number to restore (-1 to go back): ");
+    std::string in = Common::promptLine("Enter removed item number to restore (-1 to go back): ");
     int idx = 0;
     if (!tryParseInt(in, idx)) { std::cout << "Invalid number.\n"; return; }
     if (idx == -1) return;
-    if (idx < 0 || idx > static_cast<int>(removedStack.size())) {
+    if (idx < 0 || idx >= static_cast<int>(removedStack.size())) {
         std::cout << "Out of range.\n";
         return;
     }
 
     RemovedItem r = removedStack[idx];
-    removedStack.erase(removedStack.begin() + idx - 1);
+    removedStack.erase(removedStack.begin() + idx );
 
     for (auto& item : cart) {
         if (Common::equalsIgnoreCase(item.productName, r.item.productName)
@@ -765,17 +786,26 @@ void CustomerService::restoreRemovedByNumber(std::vector<OrderItem>& cart, std::
     restored.quantity = 1;
 
     size_t total=totalItem(cart);
-    size_t pos = std::min(r.rowIndex, total);
+    size_t pos = std::min(r.rowIndex, cart.size());
     cart.insert(cart.begin() + pos, r.item);
 
-    std::cout << "Removed item restored at position " << (pos + 1) << ".\n";
+
+    std::cout << "Removed item restored at position \n" ;
 }
 
 char CustomerService::promptDestinationCity() {
     std::cout << "\nAvailable cities:\n";
+
+    std::vector<char> keys;
+    keys.reserve(CITY_LABELS.size());
+
     for (const auto& kv : CITY_LABELS) {
-        char code = kv.first;
-        const std::string& name = kv.second;
+        keys.push_back(kv.first);
+    }
+    std::sort(keys.begin(), keys.end());
+
+    for (char code : keys) {
+        const std::string& name = CITY_LABELS.at(code);
         std::cout << code << " - " << name;
         if (std::find(WAREHOUSE_CITIES.begin(), WAREHOUSE_CITIES.end(), code) != WAREHOUSE_CITIES.end()) {
             std::cout << " (Warehouse)";
@@ -783,7 +813,7 @@ char CustomerService::promptDestinationCity() {
         std::cout << "\n";
     }
 
-    std::string input = promptLine("Enter destination city code: ");
+    std::string input = Common::promptLine("Enter destination city code: ");
     if (input.empty()) return '\0';
     char code = std::toupper(static_cast<unsigned char>(input[0]));
 
