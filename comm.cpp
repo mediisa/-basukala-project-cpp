@@ -90,7 +90,7 @@ bool resolveCategoryInput(const std::string& input, std::string& resolvedCategor
                 return true;
             }
         } catch (...) {
-            // fall through
+            
         }
     }
 
@@ -159,12 +159,12 @@ Order* findOrder(const std::string& orderId) {
 
 } 
 
-bool PackageLess(const Package* a, const Package* b) {
-    if (a->score != b->score) return a->score < b->score; 
-    return a->enqueueIndex > b->enqueueIndex;
-}
+/*bool PackageLess(const Package* a, const Package* b) {
+    if (a->getscore() != b->getscore()) return a->getscore() < b->getscore(); 
+    return a->getenqueueIndex() > b->getenqueueIndex();
+}*/
 
 bool PackageComparator::operator()(Package* a, Package* b) const {
-    if (a->score != b->score) return a->score < b->score; 
-    return a->enqueueIndex > b->enqueueIndex; 
+    if (a->getscore() != b->getscore()) return a->getscore() < b->getscore(); 
+    return a->getenqueueIndex() > b->getenqueueIndex(); 
 }
