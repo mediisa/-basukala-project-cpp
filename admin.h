@@ -17,7 +17,7 @@ private:
 
     void displayProducts();
     void printCategoryOptions();
-    void displayProductsByCategorySorted(const std::string& categoryFilter);
+    void displayProductsByCategorySorted(const std::string& categoryFilter , bool& sortByPrice);
     void selectProductByCategoryByNumber();
     void displayByTopSellingNamePriceProduct(int choice);
 
@@ -25,7 +25,7 @@ private:
 
     void addProduct();
     void deleteProduct();
-    void editProduct();
+    void editProduct(std::string& name);
 
     void processNextPackage();
     void displayPendingPackages();
